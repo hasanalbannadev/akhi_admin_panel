@@ -8,7 +8,11 @@
  *   POST  /admin/orders/bulk-status               {order_nos, status}
  *   GET   /admin/orders/{no}/invoice              printable invoice
  *   POST  /admin/orders/{no}/courier/steadfast    send to Steadfast
- *   GET   /admin/orders/{no}/courier/status       Steadfast delivery status
+ *   GET   /admin/orders/{no}/courier/status       Steadfast delivery status (also saved on the order)
+ *   GET   /admin/orders/{no}/courier/tracking     every step the parcel went through
+ *   POST  /admin/courier/sync                     refresh all shipped parcels
+ *   GET   /admin/courier/balance                  what Steadfast owes you
+ *   GET   /admin/courier/fraud/{phone}            customer's delivery record
  *   GET   /admin/export/orders.csv?days=&status=  CSV download
  */
 import { useEffect, useState } from 'react';
@@ -20,6 +24,8 @@ import { useAsync } from '@/lib/hooks';
 import { METHOD_LABEL, ORDER_STATUSES, ORDER_TONE, PAYMENT_STATUSES, PAYMENT_TONE, dt, getParam, label, money } from '@/lib/format';
 
 const PAGE = 20;
+const COURIER_TONE = { in_review: 'amber', pending: 'amber', hold: 'red', delivered: 'green', partial_delivered: 'blue', cancelled: 'red', exceptional: 'red' };
+const courierTone = (s) => COURIER_TONE[s] || (String(s).endsWith('approval_pending') ? 'blue' : 'gray');
 
 export default function OrdersSection() {
   const toast = useToast();
@@ -33,6 +39,8 @@ export default function OrdersSection() {
   const [bulk, setBulk] = useState('');
   const [exp, setExp] = useState(false);
   const [days, setDays] = useState(30);
+  const [cBusy, setCBusy] = useState(false);
+  const [bal, setBal] = useState(null);
 
   useEffect(() => { const o = getParam('open'); if (o) setOpen(o); }, []);
 
@@ -60,6 +68,19 @@ export default function OrdersSection() {
     catch (e) { toast.error(e.message); }
   }
 
+  async function syncCourier() {
+    setCBusy(true);
+    try {
+      const r = await api('/admin/courier/sync', { method: 'POST' });
+      if (r.error) toast.error(`Stopped: ${r.error}`);
+      toast.ok(`Checked ${r.checked} parcel(s), ${r.updated} updated`); list.reload();
+    } catch (e) { toast.error(e.message); } finally { setCBusy(false); }
+  }
+  async function showBalance() {
+    setCBusy(true);
+    try { setBal(await api('/admin/courier/balance')); } catch (e) { toast.error(e.message); } finally { setCBusy(false); }
+  }
+
   const Pill = ({ o }) => <Badge tone={ORDER_TONE[o.status]}>{label(o.status)}</Badge>;
   const Pay = ({ o }) => <Badge tone={PAYMENT_TONE[o.payment_status]}>{label(o.payment_status)}</Badge>;
 
@@ -70,6 +91,7 @@ export default function OrdersSection() {
     { h: 'Items', cell: (o) => o.items.reduce((a, i) => a + i.quantity, 0) },
     { h: 'Total', cell: (o) => <b>{money(o.total)}</b> },
     { h: 'Payment', cell: (o) => <div><div className="sm">{METHOD_LABEL[o.payment_method] || o.payment_method}</div><Pay o={o} /></div> },
+    { h: 'Courier', cell: (o) => o.courier_status ? <Badge tone={courierTone(o.courier_status)}>{label(o.courier_status)}</Badge> : <span className="muted sm">—</span> },
     { h: 'Status', cell: (o) => <Pill o={o} /> },
     { h: '', cls: 'r', cell: (o) => <button className="btn sm" onClick={() => setOpen(o.order_no)}><Icon name="eye" size={14} /> View</button> },
   ];
@@ -85,6 +107,8 @@ export default function OrdersSection() {
           <option value="">All payments</option>{PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
         </select>
         <div className="grow" />
+        <button className="btn" disabled={cBusy} onClick={syncCourier}><Icon name="refresh" size={15} /> Sync courier</button>
+        <button className="btn" disabled={cBusy} onClick={showBalance}><Icon name="truck" size={15} /> Courier balance</button>
         <button className="btn" onClick={() => setExp(true)}><Icon name="download" size={15} /> Export CSV</button>
       </div>
 
@@ -118,6 +142,14 @@ export default function OrdersSection() {
         )}
       </div></div>
 
+      {bal && (
+        <Modal title="Steadfast balance" onClose={() => setBal(null)} footer={<button className="btn" onClick={() => setBal(null)}>Close</button>}>
+          {bal.current_balance !== undefined
+            ? <div><div className="muted sm">Courier currently owes you</div><b style={{ fontSize: 24 }}>{money(bal.current_balance)}</b></div>
+            : <pre style={{ background: 'var(--gray-l)', padding: 12, borderRadius: 10, overflow: 'auto', fontSize: 12 }}>{JSON.stringify(bal, null, 2)}</pre>}
+        </Modal>
+      )}
+
       {open && <OrderDetail orderNo={open} onClose={() => setOpen(null)} onChanged={list.reload} />}
 
       {exp && (
@@ -142,6 +174,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
   const [track, setTrack] = useState('');
   const [busy, setBusy] = useState(false);
   const [sf, setSf] = useState(null);
+  const [extra, setExtra] = useState(null);   // {title, data} for tracking history / customer check
   const [invoice, setInvoice] = useState(null);
 
   useEffect(() => { if (o) { setStatus(o.status); setCourier(o.courier || ''); setTrack(o.tracking_code || ''); } }, [o]);
@@ -163,7 +196,13 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
   async function steadfastStatus() {
-    try { setSf(await api(`/admin/orders/${orderNo}/courier/status`)); } catch (e) { toast.error(e.message); }
+    try { setSf(await api(`/admin/orders/${orderNo}/courier/status`)); reload(); onChanged(); } catch (e) { toast.error(e.message); }
+  }
+  async function trackingHistory() {
+    try { setExtra({ title: 'Tracking history', data: await api(`/admin/orders/${orderNo}/courier/tracking`) }); } catch (e) { toast.error(e.message); }
+  }
+  async function customerCheck() {
+    try { setExtra({ title: `Customer record (${o.ship_phone})`, data: await api(`/admin/courier/fraud/${o.ship_phone}`) }); } catch (e) { toast.error(e.message); }
   }
   async function showInvoice() {
     try { setInvoice(await api(`/admin/orders/${orderNo}/invoice`)); } catch (e) { toast.error(e.message); }
@@ -190,6 +229,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
               <dt>Phone</dt><dd><a href={`tel:${o.ship_phone}`}>{o.ship_phone}</a></dd>
               <dt>Address</dt><dd>{o.ship_address}{o.ship_area ? `, ${o.ship_area}` : ''}, {o.ship_district}</dd>
               <dt>Placed</dt><dd>{dt(o.created_at)}</dd>
+              {o.courier_status && <><dt>Courier</dt><dd><Badge tone={courierTone(o.courier_status)}>{label(o.courier_status)}</Badge></dd></>}
             </dl>
           </div>
           <div>
@@ -210,8 +250,22 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
               <button className="btn" onClick={showInvoice}><Icon name="print" size={15} /> Invoice</button>
               {!o.tracking_code && !['cancelled', 'delivered'].includes(o.status) && <button className="btn dark" disabled={busy} onClick={sendSteadfast}><Icon name="truck" size={15} /> Send to Steadfast</button>}
               {o.courier === 'steadfast' && o.tracking_code && <button className="btn" onClick={steadfastStatus}><Icon name="refresh" size={15} /> Courier status</button>}
+              {o.courier === 'steadfast' && o.tracking_code && <button className="btn" onClick={trackingHistory}><Icon name="truck" size={15} /> Tracking history</button>}
+              <button className="btn" onClick={customerCheck}><Icon name="eye" size={15} /> Check customer</button>
             </div>
-            {sf && <pre style={{ background: 'var(--gray-l)', padding: 12, borderRadius: 10, marginTop: 12, overflow: 'auto', fontSize: 12 }}>{JSON.stringify(sf, null, 2)}</pre>}
+            {sf && (
+              <div className="card" style={{ padding: 12, marginTop: 12 }}>
+                <div className="muted sm">Courier says</div>
+                <b>{sf.label_bn || label(sf.delivery_status)}</b> <Badge tone={courierTone(sf.delivery_status)}>{label(sf.delivery_status)}</Badge>
+                <div className="muted sm" style={{ marginTop: 4 }}>Tracking {sf.tracking_code}{sf.consignment_id ? ` · Consignment ${sf.consignment_id}` : ''}</div>
+              </div>
+            )}
+            {extra && (
+              <div style={{ marginTop: 12 }}>
+                <div className="flex sp center"><b>{extra.title}</b><button className="btn sm" onClick={() => setExtra(null)}>Hide</button></div>
+                <pre style={{ background: 'var(--gray-l)', padding: 12, borderRadius: 10, marginTop: 6, overflow: 'auto', fontSize: 12 }}>{JSON.stringify(extra.data, null, 2)}</pre>
+              </div>
+            )}
           </div>
         </div>
       )}
