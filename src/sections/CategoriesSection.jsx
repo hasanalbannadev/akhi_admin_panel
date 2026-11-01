@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { slugify } from '@/lib/format';
 
-const BLANK = { name: '', slug: '', parent_id: '', image_url: '', sort_order: 0, is_active: true };
+const BLANK = { name: '', slug: '', parent_id: '', image_url: '', sort_order: 0, nav_order: 0, is_active: true };
 
 export default function CategoriesSection() {
   const toast = useToast();
@@ -38,7 +38,7 @@ export default function CategoriesSection() {
     if (!edit.name.trim() || !edit.slug.trim()) return toast.error('Name and slug are required');
     const body = {
       name: edit.name.trim(), slug: edit.slug.trim(), parent_id: edit.parent_id === '' ? null : Number(edit.parent_id),
-      image_url: edit.image_url || null, sort_order: parseInt(edit.sort_order, 10) || 0, is_active: !!edit.is_active,
+      image_url: edit.image_url || null, sort_order: parseInt(edit.sort_order, 10) || 0, nav_order: Math.max(0, parseInt(edit.nav_order, 10) || 0), is_active: !!edit.is_active,
     };
     setBusy(true);
     try {
@@ -58,6 +58,7 @@ export default function CategoriesSection() {
     { h: 'Category', cell: (c) => <div className="cell-prod"><Thumb src={c.image_url} icon="tag" /><div className="t"><b>{c.name}</b><small>/{c.slug}</small></div></div> },
     { h: 'Parent', cell: (c) => (c.parent_id ? nameOf[c.parent_id] || `#${c.parent_id}` : <span className="muted">—</span>) },
     { h: 'Order', cell: (c) => c.sort_order },
+    { h: 'Top bar', cell: (c) => (c.nav_order > 0 ? <Badge tone="green">#{c.nav_order}</Badge> : <span className="muted">Hidden</span>) },
     { h: 'Status', cell: (c) => <Badge tone={c.is_active ? 'green' : 'gray'}>{c.is_active ? 'Active' : 'Hidden'}</Badge> },
     {
       h: '', cls: 'r', cell: (c) => (
@@ -96,6 +97,9 @@ export default function CategoriesSection() {
             <Field label="Slug *"><input className="input" value={edit.slug} onChange={set('slug')} /></Field>
             <Field label="Sort order"><input className="input" type="number" value={edit.sort_order} onChange={set('sort_order')} /></Field>
           </div>
+          <Field label="Top bar position" hint="1, 2, 3… = shown in the website top bar in this order. 0 = not shown in the top bar. (Main categories only.)">
+            <input className="input" type="number" min="0" max="99" value={edit.nav_order ?? 0} onChange={set('nav_order')} />
+          </Field>
           <Field label="Parent category">
             <select className="input" value={edit.parent_id} onChange={set('parent_id')}>
               <option value="">— Top level —</option>

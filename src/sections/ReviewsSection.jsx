@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import Icon from '@/components/Icon';
 import { Badge, Empty, ErrorBox, Loading, Pager, Stars } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
-import { api } from '@/lib/api';
+import { api, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { dt } from '@/lib/format';
 
@@ -26,8 +26,13 @@ export default function ReviewsSection() {
     try { await api(`/admin/reviews/${r.id}`, { method: 'PATCH', query: { visible: v } }); toast.ok(v ? 'Review is now visible' : 'Review hidden'); list.reload(); }
     catch (e) { toast.error(e.message); }
   }
+  const [reply, setReply] = useState(null); // { id, text }
+  async function saveReply() {
+    try { await api(`/admin/reviews/${reply.id}/reply`, { method: 'PUT', body: { text: reply.text } }); toast.ok(reply.text.trim() ? 'Reply saved' : 'Reply removed'); setReply(null); list.reload(); }
+    catch (e) { toast.error(e.message); }
+  }
   async function remove(r) {
-    if (!(await confirm({ title: 'Delete review?', text: 'This cannot be undone.', confirmText: 'Delete', danger: true }))) return;
+    if (!(await confirm({ title: 'Delete review?', text: 'This cannot be undone. Its photos are deleted from the server too.', confirmText: 'Delete', danger: true }))) return;
     try { await api(`/admin/reviews/${r.id}`, { method: 'DELETE' }); toast.ok('Review deleted'); list.reload(); } catch (e) { toast.error(e.message); }
   }
 
@@ -47,9 +52,18 @@ export default function ReviewsSection() {
             <div className="grow" style={{ whiteSpace: 'normal' }}>
               <div className="flex gap center wrap"><Stars n={r.rating} /><b style={{ display: 'inline' }}>{names[r.product_id] || `Product #${r.product_id}`}</b><Badge tone={r.is_visible ? 'green' : 'gray'}>{r.is_visible ? 'Visible' : 'Hidden'}</Badge></div>
               <div style={{ margin: '5px 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{r.comment || <span className="muted">No comment</span>}</div>
+              {r.images?.length > 0 && <div className="flex gap" style={{ flexWrap: 'wrap', margin: '6px 0' }}>{r.images.map((u) => <a key={u} href={assetUrl(u)} target="_blank" rel="noopener noreferrer"><img src={assetUrl(u)} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }} /></a>)}</div>}
+              {r.reply && <div style={{ margin: '6px 0', padding: '8px 10px', borderRadius: 10, background: '#fdf2f8', fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><b>Shop reply:</b> {r.reply}</div>}
+              {reply?.id === r.id && (
+                <div style={{ margin: '8px 0' }}>
+                  <textarea className="input" maxLength={1000} value={reply.text} onChange={(e) => setReply({ id: r.id, text: e.target.value })} placeholder="Write the shop's public reply (empty = remove)" />
+                  <div className="flex gap" style={{ marginTop: 6 }}><button className="btn sm pri" onClick={saveReply}>Save reply</button><button className="btn sm" onClick={() => setReply(null)}>Cancel</button></div>
+                </div>
+              )}
               <span className="muted sm">{dt(r.created_at)}</span>
             </div>
-            <div className="flex gap">
+            <div className="flex gap" style={{ flexWrap: 'wrap' }}>
+              <button className="btn sm" onClick={() => setReply({ id: r.id, text: r.reply || '' })}><Icon name="chat" size={14} /> {r.reply ? 'Edit reply' : 'Reply'}</button>
               <button className="btn sm" onClick={() => setVisible(r, !r.is_visible)}><Icon name="eye" size={14} /> {r.is_visible ? 'Hide' : 'Show'}</button>
               <button className="btn sm danger" onClick={() => remove(r)} aria-label="Delete"><Icon name="trash" size={14} /></button>
             </div>

@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
 import { Badge, DataTable, Empty, ErrorBox, Loading, Modal, Pager, SearchBox } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
-import { api } from '@/lib/api';
+import { api, download } from '@/lib/api';
 import { useAsync, useDebounce } from '@/lib/hooks';
 import { ORDER_TONE, dt, label, money } from '@/lib/format';
 
@@ -49,7 +49,8 @@ export default function CustomersSection() {
 
   return (
     <div>
-      <div className="toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search by name or phone…" /></div>
+      <div className="toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search by name or phone…" /><div className="grow" />
+        <button className="btn" onClick={async () => { try { await download('/admin/export/customers.csv', 'customers.csv'); toast.ok('CSV downloaded'); } catch (e) { toast.error(e.message); } }}><Icon name="download" size={15} /> Export CSV</button></div>
       <ErrorBox error={list.error} onRetry={list.reload} />
       <div className="card flush"><div className="bd">
         {list.loading && !list.data ? <Loading /> : rows.length === 0 && page === 1 ? <Empty icon="users" text="No customers found" /> : (

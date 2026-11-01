@@ -18,9 +18,12 @@ const NAV = [
   { href: '/returns', label: 'Returns', icon: 'undo' },
   { href: '/customers', label: 'Customers', icon: 'users' },
   { sep: 'Marketing' },
+  { href: '/offers', label: 'Offers', icon: 'tag' },
+  { href: '/sms', label: 'SMS', icon: 'send' },
   { href: '/coupons', label: 'Coupons', icon: 'ticket' },
   { href: '/banners', label: 'Banners', icon: 'image' },
   { href: '/reviews', label: 'Reviews', icon: 'star' },
+  { href: '/support', label: 'Customer Chat', icon: 'chat', badge: 'support' },
   { href: '/chat', label: 'Chat & Messages', icon: 'chat', badge: 'chat' },
   { sep: 'Manage' },
   { href: '/delivery-zones', label: 'Delivery Zones', icon: 'truck' },
@@ -36,16 +39,17 @@ export default function Shell({ children }) {
   const path = usePathname() || '';
   const { session, logout, isOwner } = useAuth();
   const [open, setOpen] = useState(false);
-  const [counts, setCounts] = useState({ chat: 0, notif: 0, payments: 0 });
+  const [counts, setCounts] = useState({ chat: 0, notif: 0, payments: 0, support: 0 });
 
   const refresh = useCallback(async () => {
     try {
-      const [c, n, d] = await Promise.all([
+      const [c, n, d, sp] = await Promise.all([
         api('/admin/chat/unread-count').catch(() => ({ unread: 0 })),
         api('/admin/notifications', { query: { unread_only: true } }).catch(() => ({ unread: 0 })),
         api('/admin/dashboard').catch(() => ({ pending_payment_checks: 0 })),
+        api('/admin/support/unread').catch(() => ({ unread: 0 })),
       ]);
-      setCounts({ chat: c.unread || 0, notif: n.unread || 0, payments: d.pending_payment_checks || 0 });
+      setCounts({ chat: c.unread || 0, notif: n.unread || 0, payments: d.pending_payment_checks || 0, support: sp.unread || 0 });
     } catch { /* ignore */ }
   }, []);
 
@@ -59,7 +63,7 @@ export default function Shell({ children }) {
 
   const base = '/' + (path.split('/')[1] || '');
   const title = TITLES[base] || 'Admin';
-  const badge = (k) => (k === 'payments' ? counts.payments : k === 'chat' ? counts.chat : 0);
+  const badge = (k) => (k === 'payments' ? counts.payments : k === 'chat' ? counts.chat : k === 'support' ? counts.support : 0);
   const initials = (session?.username || 'A').slice(0, 1).toUpperCase();
 
   return (
