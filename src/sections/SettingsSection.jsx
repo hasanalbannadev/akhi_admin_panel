@@ -3,6 +3,7 @@
  * SETTINGS — payment methods, minimum order, change my password.
  * APIs: GET /admin/settings · PATCH /admin/settings (owner) · POST /admin/me/password
  */
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ErrorBox, Field, Loading, Switch } from '@/components/ui';
 import { useToast } from '@/components/Providers';
@@ -17,15 +18,16 @@ export default function SettingsSection() {
   const { data, loading, error, reload } = useAsync(() => api('/admin/settings'), []);
   const [methods, setMethods] = useState({});
   const [min, setMin] = useState('');
+  const [social, setSocial] = useState({});
   const [busy, setBusy] = useState(false);
   const [pw, setPw] = useState({ old_password: '', new_password: '', again: '' });
 
-  useEffect(() => { if (data) { setMethods(data.payment_methods || {}); setMin(data.min_order_amount ?? ''); } }, [data]);
+  useEffect(() => { if (data) { setMethods(data.payment_methods || {}); setMin(data.min_order_amount ?? ''); setSocial(data.social || {}); } }, [data]);
 
   async function save() {
     setBusy(true);
     try {
-      await api('/admin/settings', { method: 'PATCH', body: { payment_methods: methods, min_order_amount: min === '' ? 0 : Number(min) } });
+      await api('/admin/settings', { method: 'PATCH', body: { payment_methods: methods, min_order_amount: min === '' ? 0 : Number(min), social } });
       toast.ok('Settings saved'); reload();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
@@ -48,13 +50,19 @@ export default function SettingsSection() {
           <ErrorBox error={error} onRetry={reload} />
           {!isOwner && <div className="infobox">Only the owner can change these settings.</div>}
           <h4 style={{ marginBottom: 8 }}>Payment methods</h4>
-          {Object.keys(METHOD_LABEL).map((k) => (
+          {['cod', 'sslcommerz'].map((k) => (
             <div className="list-item" key={k}>
               <div className="grow"><b>{METHOD_LABEL[k]}</b></div>
               <Switch checked={!!methods[k]} disabled={!isOwner} onChange={(v) => setMethods((m) => ({ ...m, [k]: v }))} />
             </div>
           ))}
+          <div className="muted sm" style={{ margin: '8px 0 0' }}>bKash, Nagad and bank accounts are managed in <Link href="/payment-methods" style={{ textDecoration: 'underline' }}>Payment Accounts</Link>.</div>
           <Field label="Minimum order amount (৳)"><input className="input" type="number" min="0" disabled={!isOwner} value={min} onChange={(e) => setMin(e.target.value)} style={{ marginTop: 14 }} /></Field>
+          <h4 style={{ margin: '18px 0 8px' }}>Social links (website footer)</h4>
+          <div className="muted sm" style={{ marginBottom: 8 }}>Leave blank to hide the icon. Full https:// link; WhatsApp can be just a number; Telegram / Instagram can be @username.</div>
+          {[['facebook', 'Facebook page'], ['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['telegram', 'Telegram'], ['whatsapp', 'WhatsApp'], ['youtube', 'YouTube']].map(([k, l]) => (
+            <Field key={k} label={l}><input className="input" disabled={!isOwner} value={social[k] || ''} onChange={(e) => setSocial((s) => ({ ...s, [k]: e.target.value }))} placeholder={k === 'whatsapp' ? '01XXXXXXXXX or https://wa.me/…' : 'https://…'} /></Field>
+          ))}
           {isOwner && <button className="btn pri" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save settings'}</button>}
         </div>
       </div>

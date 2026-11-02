@@ -295,3 +295,26 @@ table.tbl { width: 100%; border-collapse: collapse; min-width: 640px; }
   #invoice, #invoice * { visibility: visible; }
   #invoice { position: absolute; left: 0; top: 0; width: 100%; }
 }
+
+/* ---------- chat composer + top bar message list ---------- */
+.composer2 { padding: 10px 12px; border-top: 1px solid var(--line); }
+.composer2 .row { display: flex; align-items: flex-end; gap: 8px; }
+.composer2 textarea.input { flex: 1; min-width: 0; resize: none; max-height: 120px; min-height: 40px; border-radius: 20px; padding: 9px 14px; line-height: 1.35; }
+.composer2 .round {
+  width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--pink);
+  display: grid; place-items: center; cursor: pointer;
+}
+.composer2 .round:hover:not(:disabled) { background: var(--pink-l); }
+.composer2 .round.pri { background: var(--pink); color: #fff; border-color: var(--pink); }
+.composer2 .round:disabled { opacity: .45; cursor: default; }
+.pop { position: relative; }
+.pop .menu {
+  position: absolute; right: 0; top: calc(100% + 8px); width: min(340px, calc(100vw - 24px)); background: #fff; border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 12px 34px rgba(20, 24, 60, .18); z-index: 50; overflow: hidden;
+}
+.pop .menu .mh { padding: 12px 14px; font-weight: 700; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
+.pop .menu .mb { max-height: 360px; overflow-y: auto; }
+.pop .menu a.mi { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
+.pop .menu a.mi:hover { background: var(--bg); }
+.pop .menu .mf { display: block; padding: 11px 14px; text-align: center; font-weight: 600; color: var(--pink); text-decoration: none; }
+@media (max-width: 600px) { .pop .menu { position: fixed; left: 12px; right: 12px; top: 70px; width: auto; } }

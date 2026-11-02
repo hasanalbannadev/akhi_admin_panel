@@ -58,8 +58,13 @@ export const PAYMENT_TONE = {
 export const RETURN_TONE = { requested: 'amber', approved: 'blue', rejected: 'red', refunded: 'green', cancelled: 'gray' };
 
 export const METHOD_LABEL = {
-  cod: 'Cash on delivery', sslcommerz: 'SSLCommerz', manual_bkash: 'bKash (manual)', manual_nagad: 'Nagad (manual)',
+  cod: 'Cash on delivery', sslcommerz: 'SSLCommerz', manual_bkash: 'bKash', manual_nagad: 'Nagad',
 };
+
+/** "pm_3" (an account you added) shows its saved name; old orders still show the old labels. */
+export function methodName(method, savedLabel) {
+  return savedLabel || METHOD_LABEL[method] || (String(method).startsWith('pm_') ? 'Payment account' : method);
+}
 
 export function label(s) {
   return String(s || '').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());

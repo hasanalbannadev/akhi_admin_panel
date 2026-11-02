@@ -183,3 +183,46 @@ export function DataTable({ columns, rows, rowKey = 'id', mobile, onRowClick, co
     </div>
   );
 }
+
+
+/** Chat box: "+" (add photo) on the left, text, send on the right - one tidy row. Photos show above the row. */
+export function ChatComposer({ text, onText, images, onImages, onSend, sending, max = 3, placeholder = 'Write a reply…' }) {
+  const toast = useToast();
+  const ref = useRef(null);
+  const [up, setUp] = useState(false);
+  const can = (text.trim() || images.length) && !sending && !up;
+
+  async function pick(e) {
+    const files = Array.from(e.target.files || []).slice(0, max - images.length);
+    e.target.value = '';
+    if (!files.length) return;
+    setUp(true);
+    const added = [];
+    for (const f of files) {
+      try { added.push(await uploadImage(f)); } catch (err) { toast.error(`${f.name}: ${err.message}`); }
+    }
+    if (added.length) onImages([...images, ...added]);
+    setUp(false);
+  }
+  return (
+    <form className="composer2" onSubmit={(e) => { e.preventDefault(); if (can) onSend(); }}>
+      {images.length > 0 && (
+        <div className="imgs" style={{ marginBottom: 8 }}>
+          {images.map((u, i) => (
+            <div className="im" key={u + i}><img src={assetUrl(u)} alt="" />
+              <button type="button" onClick={() => onImages(images.filter((_, k) => k !== i))} aria-label="Remove"><Icon name="x" size={13} /></button></div>
+          ))}
+        </div>
+      )}
+      <div className="row">
+        <button type="button" className="round" title="Add photo" aria-label="Add photo" disabled={images.length >= max || up} onClick={() => ref.current?.click()}>
+          {up ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="plus" size={18} />}
+        </button>
+        <textarea className="input" rows={1} value={text} onChange={(e) => onText(e.target.value)} maxLength={1500} placeholder={placeholder}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700) { e.preventDefault(); if (can) onSend(); } }} />
+        <button type="submit" className="round pri" aria-label="Send" disabled={!can}>{sending ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="send" size={17} />}</button>
+      </div>
+      <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={pick} />
+    </form>
+  );
+}

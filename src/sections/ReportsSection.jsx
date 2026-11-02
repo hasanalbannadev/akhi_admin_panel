@@ -9,7 +9,7 @@ import { Badge, DataTable, Empty, ErrorBox, Loading } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useAsync } from '@/lib/hooks';
-import { METHOD_LABEL, label, money, num } from '@/lib/format';
+import { methodName, label, money, num } from '@/lib/format';
 
 const COLORS = ['#e83e8c', '#3b82f6', '#16a870', '#e29a0d', '#8b5cf6', '#06b6d4', '#e5484d'];
 
@@ -57,7 +57,7 @@ export default function ReportsSection() {
               {(sales.data?.top_products || []).length === 0 ? <Empty icon="box" text="No sales" /> : <HBars rows={sales.data.top_products.map((t) => ({ label: t.name, value: t.qty, sub: money(t.revenue) }))} fmt={(v) => `${num(v)} sold`} />}
             </div></div>
             <div className="card"><div className="hd"><h3>By payment method</h3></div><div className="bd">
-              {(sales.data?.by_payment || []).length === 0 ? <Empty icon="card" text="No data" /> : <Donut centerLabel="Orders" slices={sales.data.by_payment.map((p, i) => ({ label: METHOD_LABEL[p.method] || p.method, value: p.orders, color: COLORS[i % COLORS.length] }))} />}
+              {(sales.data?.by_payment || []).length === 0 ? <Empty icon="card" text="No data" /> : <Donut centerLabel="Orders" slices={sales.data.by_payment.map((p, i) => ({ label: methodName(p.method), value: p.orders, color: COLORS[i % COLORS.length] }))} />}
             </div></div>
           </div>
 

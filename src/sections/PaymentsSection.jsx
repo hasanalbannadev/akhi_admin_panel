@@ -14,7 +14,7 @@ import { Badge, DataTable, Empty, ErrorBox, Field, Loading, Modal, Pager } from 
 import { useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { METHOD_LABEL, PAYMENT_TONE, dt, label, money } from '@/lib/format';
+import { METHOD_LABEL, methodName, PAYMENT_TONE, dt, label, money } from '@/lib/format';
 
 export default function PaymentsSection() {
   const toast = useToast();
@@ -26,6 +26,7 @@ export default function PaymentsSection() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const accts = useAsync(() => api('/admin/payment-methods').catch(() => []), []);
   const pending = useAsync(() => api('/admin/payments/pending'), []);
   const all = useAsync(() => (tab === 'all' ? api('/admin/payments', { query: { status, method, page } }) : Promise.resolve(null)), [tab, status, method, page]);
 
@@ -41,7 +42,7 @@ export default function PaymentsSection() {
 
   const pendingCols = [
     { h: 'Order', cell: (p) => <Link href={`/orders?open=${p.order_no}`} className="bold">{p.order_no}</Link> },
-    { h: 'Method', cell: (p) => <Badge tone="pink">{METHOD_LABEL[p.method] || p.method}</Badge> },
+    { h: 'Method', cell: (p) => <Badge tone="pink">{methodName(p.method, p.label)}</Badge> },
     { h: 'Amount', cell: (p) => <b>{money(p.amount)}</b> },
     { h: 'Sender number', cell: (p) => p.sender_number || '—' },
     { h: 'TrxID', cell: (p) => <code>{p.trx_id || '—'}</code> },
@@ -57,7 +58,7 @@ export default function PaymentsSection() {
   ];
   const allCols = [
     { h: 'Order', cell: (p) => <Link href={`/orders?open=${p.order_no}`} className="bold">{p.order_no}</Link> },
-    { h: 'Method', cell: (p) => METHOD_LABEL[p.method] || p.method },
+    { h: 'Method', cell: (p) => methodName(p.method, p.label) },
     { h: 'Amount', cell: (p) => <b>{money(p.amount)}</b> },
     { h: 'Sender', cell: (p) => p.sender_number || '—' },
     { h: 'TrxID', cell: (p) => <code>{p.trx_id || '—'}</code> },
@@ -84,6 +85,7 @@ export default function PaymentsSection() {
             <select className="input" style={{ width: 190 }} value={method} onChange={(e) => { setMethod(e.target.value); setPage(1); }}>
               <option value="">All methods</option>
               {Object.entries(METHOD_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {(accts.data || []).map((a) => <option key={a.id} value={`pm_${a.id}`}>{a.title}</option>)}
             </select>
           </>
         )}

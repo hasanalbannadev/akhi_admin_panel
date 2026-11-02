@@ -19,7 +19,7 @@ import { useConfirm, useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useAsync } from '@/lib/hooks';
-import { METHOD_LABEL, ORDER_TONE, dt, label, money, num, timeAgo } from '@/lib/format';
+import { METHOD_LABEL, methodName, ORDER_TONE, dt, label, money, num, timeAgo } from '@/lib/format';
 
 const STATUS_COLORS = {
   pending: '#e29a0d', confirmed: '#3b82f6', processing: '#06b6d4', shipped: '#8b5cf6', delivered: '#16a870', cancelled: '#e5484d',
@@ -158,7 +158,7 @@ export default function DashboardSection() {
               <div className="list-item" key={p.payment_id}>
                 <div className="grow">
                   <b>{p.order_no}</b>
-                  <span className="muted sm">{METHOD_LABEL[p.method] || p.method} · {p.trx_id || '—'}</span>
+                  <span className="muted sm">{methodName(p.method, p.label)} · {p.trx_id || '—'}</span>
                 </div>
                 <b>{money(p.amount)}</b>
                 <button className="btn sm ok" onClick={() => review(p, 'approve')} aria-label="Approve"><Icon name="check" size={14} /></button>

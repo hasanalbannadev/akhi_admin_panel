@@ -7,11 +7,11 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/components/Icon';
-import { Empty, ErrorBox, ImageUploader, Loading } from '@/components/ui';
+import { ChatComposer, Empty, ErrorBox, Loading } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { dt, timeAgo } from '@/lib/format';
+import { dt, getParam, timeAgo } from '@/lib/format';
 
 export default function SupportSection() {
   const toast = useToast();
@@ -32,8 +32,20 @@ export default function SupportSection() {
     return () => clearInterval(t);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function send(e) {
-    e.preventDefault();
+  // /support?u=<user id> (from the top bar message list) opens that customer's chat
+  useEffect(() => {
+    const u = Number(getParam('u'));
+    if (u && threads.data && !sel) { const t = threads.data.find((x) => x.user_id === u); if (t) setSel(t); }
+  }, [threads.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // clicking a customer in the top bar message list while this page is already open
+  useEffect(() => {
+    const h = (e) => setSel(e.detail);
+    window.addEventListener('support-open', h);
+    return () => window.removeEventListener('support-open', h);
+  }, []);
+
+  async function send() {
     if (!sel || (!text.trim() && !imgs.length)) return;
     setSending(true);
     try {
@@ -89,11 +101,7 @@ export default function SupportSection() {
                 ))}
                 <div ref={endRef} />
               </div>
-              <form className="composer" onSubmit={send} style={{ flexWrap: 'wrap' }}>
-                <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a reply…" maxLength={1500} />
-                <button className="btn pri" disabled={sending || (!text.trim() && !imgs.length)}><Icon name="send" size={15} /> Send</button>
-                <div style={{ flexBasis: '100%' }}><ImageUploader value={imgs} onChange={setImgs} max={3} /></div>
-              </form>
+              <ChatComposer text={text} onText={setText} images={imgs} onImages={setImgs} onSend={send} sending={sending} />
             </>
           )}
         </div>

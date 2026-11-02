@@ -21,10 +21,13 @@ import { Badge, DataTable, Empty, ErrorBox, Field, Loading, Modal, Pager, Search
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, download } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { METHOD_LABEL, ORDER_STATUSES, ORDER_TONE, PAYMENT_STATUSES, PAYMENT_TONE, dt, getParam, label, money } from '@/lib/format';
+import { methodName, ORDER_STATUSES, ORDER_TONE, PAYMENT_STATUSES, PAYMENT_TONE, dt, getParam, label, money } from '@/lib/format';
 
 const PAGE = 20;
-const COURIER_TONE = { in_review: 'amber', pending: 'amber', hold: 'red', delivered: 'green', partial_delivered: 'blue', cancelled: 'red', exceptional: 'red' };
+// every status Steadfast can report
+export const COURIER_STATUSES = ['pending', 'in_review', 'hold', 'delivered', 'partial_delivered', 'cancelled', 'unknown',
+  'delivered_approval_pending', 'partial_delivered_approval_pending', 'cancelled_approval_pending', 'unknown_approval_pending'];
+const COURIER_TONE = { in_review: 'amber', pending: 'amber', hold: 'red', delivered: 'green', partial_delivered: 'blue', cancelled: 'red', exceptional: 'red', unknown: 'gray' };
 const courierTone = (s) => COURIER_TONE[s] || (String(s).endsWith('approval_pending') ? 'blue' : 'gray');
 
 export default function OrdersSection() {
@@ -32,6 +35,8 @@ export default function OrdersSection() {
   const confirm = useConfirm();
   const [status, setStatus] = useState('');
   const [pay, setPay] = useState('');
+  const [cs, setCs] = useState('');          // courier status filter
+  const [cr, setCr] = useState(false);       // only orders where the customer asked to cancel
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [sel, setSel] = useState([]);
@@ -44,7 +49,7 @@ export default function OrdersSection() {
 
   useEffect(() => { const o = getParam('open'); if (o) setOpen(o); }, []);
 
-  const list = useAsync(() => api('/admin/orders', { query: { status, payment_status: pay, page, page_size: PAGE } }), [status, pay, page]);
+  const list = useAsync(() => api('/admin/orders', { query: { status, payment_status: pay, courier_status: cs, cancel_requested: cr ? true : undefined, page, page_size: PAGE } }), [status, pay, cs, cr, page]);
   const rows = (list.data?.items || []).filter((o) => {
     if (!q.trim()) return true;
     const s = q.toLowerCase();
@@ -86,11 +91,11 @@ export default function OrdersSection() {
 
   const columns = [
     { h: <input type="checkbox" checked={allOn} onChange={() => setSel(allOn ? [] : rows.map((o) => o.order_no))} aria-label="Select all" />, noClick: true, cell: (o) => <input type="checkbox" checked={sel.includes(o.order_no)} onChange={() => toggle(o.order_no)} /> },
-    { h: 'Order', cell: (o) => <div><b>{o.order_no}</b><div className="muted sm">{dt(o.created_at)}</div></div> },
+    { h: 'Order', cell: (o) => <div><b>{o.order_no}</b><div className="muted sm">{dt(o.created_at)}</div>{o.cancel_requested && o.status !== 'cancelled' && <Badge tone="red">Cancel requested</Badge>}</div> },
     { h: 'Customer', cell: (o) => <div><b>{o.ship_name}</b><div className="muted sm">{o.ship_phone} · {o.ship_district}</div></div> },
     { h: 'Items', cell: (o) => o.items.reduce((a, i) => a + i.quantity, 0) },
     { h: 'Total', cell: (o) => <b>{money(o.total)}</b> },
-    { h: 'Payment', cell: (o) => <div><div className="sm">{METHOD_LABEL[o.payment_method] || o.payment_method}</div><Pay o={o} /></div> },
+    { h: 'Payment', cell: (o) => <div><div className="sm">{methodName(o.payment_method, o.payment_label)}</div><Pay o={o} /></div> },
     { h: 'Courier', cell: (o) => o.courier_status ? <Badge tone={courierTone(o.courier_status)}>{label(o.courier_status)}</Badge> : <span className="muted sm">—</span> },
     { h: 'Status', cell: (o) => <Pill o={o} /> },
     { h: '', cls: 'r', cell: (o) => <button className="btn sm" onClick={() => setOpen(o.order_no)}><Icon name="eye" size={14} /> View</button> },
@@ -106,6 +111,10 @@ export default function OrdersSection() {
         <select className="input" style={{ width: 190 }} value={pay} onChange={(e) => { setPay(e.target.value); setPage(1); setSel([]); }}>
           <option value="">All payments</option>{PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
         </select>
+        <select className="input" style={{ width: 190 }} value={cs} onChange={(e) => { setCs(e.target.value); setPage(1); setSel([]); }}>
+          <option value="">All courier statuses</option>{COURIER_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
+        </select>
+        <label className="check"><input type="checkbox" checked={cr} onChange={(e) => { setCr(e.target.checked); setPage(1); setSel([]); }} /> Cancel requests</label>
         <div className="grow" />
         <button className="btn" disabled={cBusy} onClick={syncCourier}><Icon name="refresh" size={15} /> Sync courier</button>
         <button className="btn" disabled={cBusy} onClick={showBalance}><Icon name="truck" size={15} /> Courier balance</button>
@@ -187,6 +196,17 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
       toast.ok('Order updated'); reload(); onChanged();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
+  async function cancelNow() {
+    if (!(await confirm({ title: 'Cancel this order?', text: 'The customer asked for it. Stock goes back to inventory.', confirmText: 'Cancel order', danger: true }))) return;
+    setBusy(true);
+    try { await api(`/admin/orders/${orderNo}/status`, { method: 'PATCH', body: { status: 'cancelled' } }); toast.ok('Order cancelled'); reload(); onChanged(); }
+    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  }
+  async function keepOrder() {
+    setBusy(true);
+    try { await api(`/admin/orders/${orderNo}/cancel-request/dismiss`, { method: 'POST' }); toast.ok('Cancel request dismissed'); reload(); onChanged(); }
+    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  }
   async function sendSteadfast() {
     if (!(await confirm({ title: 'Send to Steadfast?', text: 'A consignment will be created and the order marked as shipped.', confirmText: 'Send' }))) return;
     setBusy(true);
@@ -210,7 +230,14 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
 
   return (
     <Modal title={`Order ${orderNo}`} size="wide" onClose={onClose}>
-      {loading ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : o && (
+      {loading ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : o && (<>
+        {o.cancel_requested && o.status !== 'cancelled' && (
+          <div className="infobox" style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <b style={{ flex: 1, minWidth: 200 }}>The customer asked to cancel this order.</b>
+            <button className="btn danger sm" disabled={busy} onClick={cancelNow}>Cancel order</button>
+            <button className="btn sm" disabled={busy} onClick={keepOrder}>Keep order</button>
+          </div>
+        )}
         <div className="grid g2 stack" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
           <div>
             <h4 style={{ marginBottom: 8 }}>Items</h4>
@@ -235,7 +262,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
           <div>
             <h4 style={{ marginBottom: 8 }}>Payment</h4>
             <div className="flex gap wrap center" style={{ marginBottom: 16 }}>
-              <span>{METHOD_LABEL[o.payment_method] || o.payment_method}</span>
+              <span>{methodName(o.payment_method, o.payment_label)}</span>
               <Badge tone={PAYMENT_TONE[o.payment_status]}>{label(o.payment_status)}</Badge>
             </div>
             <h4 style={{ marginBottom: 8 }}>Update order</h4>
@@ -268,7 +295,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
             )}
           </div>
         </div>
-      )}
+      </>)}
       {invoice && <Invoice inv={invoice} onClose={() => setInvoice(null)} />}
     </Modal>
   );
