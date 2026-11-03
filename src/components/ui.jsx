@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
-import { assetUrl, uploadImage } from '@/lib/api';
+import { assetUrl, discardImage, uploadImage } from '@/lib/api';
 import { useToast } from './Providers';
 
 export function Loading() { return <div className="loading"><span className="spin" /></div>; }
@@ -141,7 +141,7 @@ export function ImageUploader({ value, onChange, max = 8, single = false }) {
           <div className="im" key={u + i}>
             <img src={assetUrl(u)} alt="" />
             {i === 0 && !single && <span className="first">Main</span>}
-            <button type="button" onClick={() => onChange(list.filter((_, k) => k !== i))} aria-label="Remove"><Icon name="x" size={13} /></button>
+            <button type="button" onClick={() => { discardImage(u); onChange(list.filter((_, k) => k !== i)); }} aria-label="Remove"><Icon name="x" size={13} /></button>
             {!single && list.length > 1 && (
               <div style={{ position: 'absolute', bottom: 3, right: 3, display: 'flex', gap: 2 }}>
                 {i > 0 && <button type="button" style={{ position: 'static', width: 20, height: 20 }} onClick={() => move(i, -1)} aria-label="Move left">‹</button>}

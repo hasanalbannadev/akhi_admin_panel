@@ -27,7 +27,8 @@ export default function NotificationsSection() {
   const { data, loading, error, reload } = useAsync(() => api('/admin/notifications', { query: { unread_only: unreadOnly } }), [unreadOnly]);
   const items = data?.items || [];
 
-  const act = async (fn, msg) => { try { await fn(); if (msg) toast.ok(msg); reload(); } catch (e) { toast.error(e.message); } };
+  const tell = (detail) => window.dispatchEvent(new CustomEvent('badges-refresh', { detail }));
+  const act = async (fn, msg, zero) => { try { await fn(); if (msg) toast.ok(msg); reload(); tell(zero ? { notif: 0 } : undefined); } catch (e) { toast.error(e.message); } };
 
   return (
     <div>
@@ -37,7 +38,7 @@ export default function NotificationsSection() {
           <button className={`tab ${unreadOnly ? 'on' : ''}`} onClick={() => setUnreadOnly(true)}>Unread {data?.unread ? `(${data.unread})` : ''}</button>
         </div>
         <div className="grow" />
-        <button className="btn" disabled={!data?.unread} onClick={() => act(() => api('/admin/notifications/read-all', { method: 'POST' }), 'All marked as read')}><Icon name="check" size={15} /> Mark all read</button>
+        <button className="btn" disabled={!data?.unread} onClick={() => act(() => api('/admin/notifications/read-all', { method: 'POST' }), 'All marked as read', true)}><Icon name="check" size={15} /> Mark all read</button>
       </div>
       <ErrorBox error={error} onRetry={reload} />
       <div className="card flush"><div className="bd" style={{ padding: '0 18px' }}>
@@ -50,7 +51,7 @@ export default function NotificationsSection() {
                 <div style={{ fontWeight: n.is_read ? 400 : 700 }}>{n.text}</div>
                 <span className="muted sm">{timeAgo(n.created_at)}</span>
               </div>
-              {href && <Link href={href} className="btn sm" onClick={() => !n.is_read && api(`/admin/notifications/${n.id}/read`, { method: 'PATCH' }).catch(() => {})}>Open</Link>}
+              {href && <Link href={href} className="btn sm" onClick={() => !n.is_read && api(`/admin/notifications/${n.id}/read`, { method: 'PATCH' }).then(() => tell()).catch(() => {})}>Open</Link>}
               {!n.is_read && <button className="btn sm" onClick={() => act(() => api(`/admin/notifications/${n.id}/read`, { method: 'PATCH' }))} aria-label="Mark read"><Icon name="check" size={14} /></button>}
               <button className="btn sm danger" onClick={() => act(() => api(`/admin/notifications/${n.id}`, { method: 'DELETE' }))} aria-label="Delete"><Icon name="trash" size={14} /></button>
             </div>

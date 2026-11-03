@@ -318,3 +318,19 @@ table.tbl { width: 100%; border-collapse: collapse; min-width: 640px; }
 .pop .menu a.mi:hover { background: var(--bg); }
 .pop .menu .mf { display: block; padding: 11px 14px; text-align: center; font-weight: 600; color: var(--pink); text-decoration: none; }
 @media (max-width: 600px) { .pop .menu { position: fixed; left: 12px; right: 12px; top: 70px; width: auto; } }
+
+/* ---------- order progress (filled circles) ---------- */
+.tracker { display: flex; align-items: flex-start; gap: 0; margin: 0 0 8px; padding: 14px 10px; background: var(--bg, #f6f7fb); border-radius: 12px; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+.tracker .st { flex: 1 0 78px; min-width: 78px; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; text-align: center; }
+.tracker .st:not(:last-of-type)::after { content: ''; position: absolute; top: 11px; left: calc(50% + 14px); right: calc(-50% + 14px); height: 2px; background: var(--line); }
+.tracker .st.done:not(:last-of-type)::after { background: #16a34a; }
+.tracker .dotc { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); background: #fff; display: grid; place-items: center; color: #fff; z-index: 1; }
+.tracker .st.done .dotc { background: #16a34a; border-color: #16a34a; }
+.tracker .st.cur .dotc { box-shadow: 0 0 0 4px rgba(22, 163, 74, .2); }
+.tracker .st.cancelled .dotc { background: #dc2626; border-color: #dc2626; }
+.tracker .st.cancelled small { color: #dc2626; font-weight: 600; }
+.tracker small { font-size: 11px; color: var(--muted, #6b7090); line-height: 1.2; }
+.tracker .st.done small { color: var(--ink); font-weight: 600; }
+.trackwrap { margin: 0 0 16px; max-width: 100%; }
+.trackwrap .cs { text-align: center; }
+.card, .grid > * { min-width: 0; }

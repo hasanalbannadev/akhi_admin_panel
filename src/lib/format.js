@@ -47,15 +47,19 @@ export function getParam(name) {
 }
 
 export const ORDER_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+export const FILTER_STATUSES = [...ORDER_STATUSES, 'returned'];
 export const PAYMENT_STATUSES = ['unpaid', 'pending_verification', 'paid', 'refunded'];
 
 export const ORDER_TONE = {
-  pending: 'amber', confirmed: 'blue', processing: 'blue', shipped: 'purple', delivered: 'green', cancelled: 'red',
+  pending: 'amber', confirmed: 'blue', processing: 'blue', shipped: 'purple', delivered: 'green', cancelled: 'red', returned: 'gray',
 };
 export const PAYMENT_TONE = {
   unpaid: 'gray', pending_verification: 'amber', paid: 'green', refunded: 'red', pending: 'amber', approved: 'green', rejected: 'red',
 };
-export const RETURN_TONE = { requested: 'amber', approved: 'blue', rejected: 'red', refunded: 'green', cancelled: 'gray' };
+export const RETURN_TONE = { requested: 'amber', approved: 'blue', pickup: 'purple', received: 'blue', rejected: 'red', refunded: 'green', cancelled: 'gray' };
+
+const COURIER_TONE = { in_review: 'amber', pending: 'amber', hold: 'red', delivered: 'green', partial_delivered: 'blue', cancelled: 'red', exceptional: 'red', unknown: 'gray', picked: 'blue', in_transit: 'blue', assigned_for_delivery: 'blue', at_the_sorting_hub: 'blue', received_at_last_mile_hub: 'blue', order_created: 'amber', pickup_requested: 'amber', assigned_for_pickup: 'amber', pickup_failed: 'red', pickup_cancelled: 'red', delivery_failed: 'red', on_hold: 'red', return: 'red', partial_delivery: 'blue' };
+export const courierTone = (s) => COURIER_TONE[s] || (String(s).endsWith('approval_pending') ? 'blue' : 'gray');
 
 export const METHOD_LABEL = {
   cod: 'Cash on delivery', sslcommerz: 'SSLCommerz', manual_bkash: 'bKash', manual_nagad: 'Nagad',

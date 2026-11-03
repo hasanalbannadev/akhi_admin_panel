@@ -103,6 +103,11 @@ export function assetUrl(u) {
   return i >= 0 ? u.slice(i) : u;
 }
 
+/** Throws away an uploaded image nobody saved (server deletes it only if nothing uses it). */
+export async function discardImage(url) {
+  try { await api('/admin/upload?url=' + encodeURIComponent(url), { method: 'DELETE' }); } catch { /* best effort */ }
+}
+
 /** Uploads one image file and returns its public URL. (POST /admin/upload) */
 export async function uploadImage(file) {
   const fd = new FormData();

@@ -7,7 +7,8 @@
  *   PATCH /admin/orders/{no}/status               {status, courier, tracking_code}
  *   POST  /admin/orders/bulk-status               {order_nos, status}
  *   GET   /admin/orders/{no}/invoice              printable invoice
- *   POST  /admin/orders/{no}/courier/steadfast    send to Steadfast
+ *   POST  /admin/orders/{no}/courier/send         {courier: steadfast|pathao, city_id?, zone_id?, area_id?}
+ *   GET   /admin/courier/pathao/cities | cities/{id}/zones | zones/{id}/areas
  *   GET   /admin/orders/{no}/courier/status       Steadfast delivery status (also saved on the order)
  *   GET   /admin/orders/{no}/courier/tracking     every step the parcel went through
  *   POST  /admin/courier/sync                     refresh all shipped parcels
@@ -17,18 +18,20 @@
  */
 import { useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
+import FlowTracker from '@/components/FlowTracker';
 import { Badge, DataTable, Empty, ErrorBox, Field, Loading, Modal, Pager, SearchBox } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, download } from '@/lib/api';
-import { useAsync } from '@/lib/hooks';
-import { methodName, ORDER_STATUSES, ORDER_TONE, PAYMENT_STATUSES, PAYMENT_TONE, dt, getParam, label, money } from '@/lib/format';
+import { useAsync, useDebounce } from '@/lib/hooks';
+import { courierTone, FILTER_STATUSES, methodName, ORDER_STATUSES, ORDER_TONE, PAYMENT_STATUSES, PAYMENT_TONE, dt, getParam, label, money } from '@/lib/format';
 
 const PAGE = 20;
 // every status Steadfast can report
 export const COURIER_STATUSES = ['pending', 'in_review', 'hold', 'delivered', 'partial_delivered', 'cancelled', 'unknown',
   'delivered_approval_pending', 'partial_delivered_approval_pending', 'cancelled_approval_pending', 'unknown_approval_pending'];
-const COURIER_TONE = { in_review: 'amber', pending: 'amber', hold: 'red', delivered: 'green', partial_delivered: 'blue', cancelled: 'red', exceptional: 'red', unknown: 'gray' };
-const courierTone = (s) => COURIER_TONE[s] || (String(s).endsWith('approval_pending') ? 'blue' : 'gray');
+// Pathao statuses
+export const PATHAO_STATUSES = ['order_created', 'pickup_requested', 'assigned_for_pickup', 'picked', 'pickup_failed', 'pickup_cancelled',
+  'at_the_sorting_hub', 'in_transit', 'received_at_last_mile_hub', 'assigned_for_delivery', 'partial_delivery', 'return', 'delivery_failed', 'on_hold'];
 
 export default function OrdersSection() {
   const toast = useToast();
@@ -49,12 +52,9 @@ export default function OrdersSection() {
 
   useEffect(() => { const o = getParam('open'); if (o) setOpen(o); }, []);
 
-  const list = useAsync(() => api('/admin/orders', { query: { status, payment_status: pay, courier_status: cs, cancel_requested: cr ? true : undefined, page, page_size: PAGE } }), [status, pay, cs, cr, page]);
-  const rows = (list.data?.items || []).filter((o) => {
-    if (!q.trim()) return true;
-    const s = q.toLowerCase();
-    return o.order_no.toLowerCase().includes(s) || o.ship_name.toLowerCase().includes(s) || o.ship_phone.includes(s);
-  });
+  const dq = useDebounce(q, 350);
+  const list = useAsync(() => api('/admin/orders', { query: { status, payment_status: pay, courier_status: cs, cancel_requested: cr ? true : undefined, q: dq.trim() || undefined, page, page_size: PAGE } }), [status, pay, cs, cr, dq, page]);
+  const rows = list.data?.items || [];
 
   const toggle = (no) => setSel((s) => (s.includes(no) ? s.filter((x) => x !== no) : [...s, no]));
   const allOn = rows.length > 0 && rows.every((o) => sel.includes(o.order_no));
@@ -104,15 +104,15 @@ export default function OrdersSection() {
   return (
     <div>
       <div className="toolbar">
-        <SearchBox value={q} onChange={setQ} placeholder="Order no, name or phone (this page)" />
+        <SearchBox value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Search order ID, name, phone or tracking…" />
         <select className="input" style={{ width: 160 }} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); setSel([]); }}>
-          <option value="">All statuses</option>{ORDER_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
+          <option value="">All statuses</option>{FILTER_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
         </select>
         <select className="input" style={{ width: 190 }} value={pay} onChange={(e) => { setPay(e.target.value); setPage(1); setSel([]); }}>
           <option value="">All payments</option>{PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
         </select>
         <select className="input" style={{ width: 190 }} value={cs} onChange={(e) => { setCs(e.target.value); setPage(1); setSel([]); }}>
-          <option value="">All courier statuses</option>{COURIER_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
+          <option value="">All courier statuses</option><optgroup label="Steadfast">{COURIER_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}</optgroup><optgroup label="Pathao">{PATHAO_STATUSES.map((s) => <option key={'p' + s} value={s}>{label(s)}</option>)}</optgroup>
         </select>
         <label className="check"><input type="checkbox" checked={cr} onChange={(e) => { setCr(e.target.checked); setPage(1); setSel([]); }} /> Cancel requests</label>
         <div className="grow" />
@@ -207,14 +207,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
     try { await api(`/admin/orders/${orderNo}/cancel-request/dismiss`, { method: 'POST' }); toast.ok('Cancel request dismissed'); reload(); onChanged(); }
     catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
-  async function sendSteadfast() {
-    if (!(await confirm({ title: 'Send to Steadfast?', text: 'A consignment will be created and the order marked as shipped.', confirmText: 'Send' }))) return;
-    setBusy(true);
-    try {
-      const r = await api(`/admin/orders/${orderNo}/courier/steadfast`, { method: 'POST' });
-      toast.ok(`Sent. Tracking ${r.tracking_code}`); reload(); onChanged();
-    } catch (e) { toast.error(e.message); } finally { setBusy(false); }
-  }
+  const [sendDlg, setSendDlg] = useState(false);
   async function steadfastStatus() {
     try { setSf(await api(`/admin/orders/${orderNo}/courier/status`)); reload(); onChanged(); } catch (e) { toast.error(e.message); }
   }
@@ -238,6 +231,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
             <button className="btn sm" disabled={busy} onClick={keepOrder}>Keep order</button>
           </div>
         )}
+        <Tracker o={o} />
         <div className="grid g2 stack" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
           <div>
             <h4 style={{ marginBottom: 8 }}>Items</h4>
@@ -275,9 +269,9 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
             <div className="flex gap wrap">
               <button className="btn pri" disabled={busy} onClick={save}>Save</button>
               <button className="btn" onClick={showInvoice}><Icon name="print" size={15} /> Invoice</button>
-              {!o.tracking_code && !['cancelled', 'delivered'].includes(o.status) && <button className="btn dark" disabled={busy} onClick={sendSteadfast}><Icon name="truck" size={15} /> Send to Steadfast</button>}
-              {o.courier === 'steadfast' && o.tracking_code && <button className="btn" onClick={steadfastStatus}><Icon name="refresh" size={15} /> Courier status</button>}
-              {o.courier === 'steadfast' && o.tracking_code && <button className="btn" onClick={trackingHistory}><Icon name="truck" size={15} /> Tracking history</button>}
+              {!o.tracking_code && !['cancelled', 'delivered'].includes(o.status) && <button className="btn dark" disabled={busy} onClick={() => setSendDlg(true)}><Icon name="truck" size={15} /> Send to courier</button>}
+              {['steadfast', 'pathao'].includes(o.courier) && o.tracking_code && <button className="btn" onClick={steadfastStatus}><Icon name="refresh" size={15} /> Courier status</button>}
+              {['steadfast', 'pathao'].includes(o.courier) && o.tracking_code && <button className="btn" onClick={trackingHistory}><Icon name="truck" size={15} /> Tracking history</button>}
               <button className="btn" onClick={customerCheck}><Icon name="eye" size={15} /> Check customer</button>
             </div>
             {sf && (
@@ -296,6 +290,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
           </div>
         </div>
       </>)}
+      {sendDlg && <SendCourier orderNo={orderNo} onClose={() => setSendDlg(false)} onDone={() => { setSendDlg(false); reload(); onChanged(); }} />}
       {invoice && <Invoice inv={invoice} onClose={() => setInvoice(null)} />}
     </Modal>
   );
@@ -318,6 +313,71 @@ function Invoice({ inv, onClose }) {
         <div className="sum-row tot"><span>Total</span><span>{money(inv.total)}</span></div>
         <div className="muted sm" style={{ marginTop: 10 }}>{METHOD_LABEL[inv.payment_method]} · {label(inv.payment_status)}</div>
       </div>
+    </Modal>
+  );
+}
+
+
+/* ----------------------------- order progress (filled circle = reached) ----------------------------- */
+const STEPS = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+const Tracker = FlowTracker;
+
+/* ----------------------------- choose a courier for this order ----------------------------- */
+function SendCourier({ orderNo, onClose, onDone }) {
+  const toast = useToast();
+  const [courier, setCourier] = useState('steadfast');
+  const [cities, setCities] = useState(null);
+  const [zones, setZones] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [sel, setSel] = useState({ city: '', zone: '', area: '' });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (courier !== 'pathao' || cities) return;
+    api('/admin/courier/pathao/cities').then((r) => setCities(Array.isArray(r) ? r : [])).catch((e) => { setCities([]); toast.error(e.message); });
+  }, [courier]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function pickCity(v) {
+    setSel({ city: v, zone: '', area: '' }); setZones([]); setAreas([]);
+    if (v) { try { setZones(await api(`/admin/courier/pathao/cities/${v}/zones`)); } catch (e) { toast.error(e.message); } }
+  }
+  async function pickZone(v) {
+    setSel((s) => ({ ...s, zone: v, area: '' })); setAreas([]);
+    if (v) { try { setAreas(await api(`/admin/courier/pathao/zones/${v}/areas`)); } catch (e) { toast.error(e.message); } }
+  }
+  async function send() {
+    setBusy(true);
+    try {
+      const body = { courier };
+      if (courier === 'pathao') { if (sel.city) body.city_id = Number(sel.city); if (sel.zone) body.zone_id = Number(sel.zone); if (sel.area) body.area_id = Number(sel.area); }
+      const r = await api(`/admin/orders/${orderNo}/courier/send`, { method: 'POST', body });
+      toast.ok(`Sent via ${label(r.courier)}. Tracking ${r.tracking_code}`); onDone();
+    } catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <Modal title="Send to courier" onClose={onClose}
+      footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn pri" disabled={busy} onClick={send}>{busy ? 'Sending…' : 'Send parcel'}</button></>}>
+      <Field label="Courier for this order">
+        <div className="flex gap">
+          {[['steadfast', 'Steadfast'], ['pathao', 'Pathao']].map(([k, v]) => (
+            <label key={k} className="check" style={{ border: `2px solid ${courier === k ? 'var(--pink)' : 'var(--line)'}`, borderRadius: 10, padding: '10px 16px', flex: 1 }}>
+              <input type="radio" name="courier" checked={courier === k} onChange={() => setCourier(k)} /> <b>{v}</b>
+            </label>
+          ))}
+        </div>
+      </Field>
+      {courier === 'pathao' && (
+        <>
+          <div className="muted sm" style={{ marginBottom: 8 }}>City / zone / area are optional: leave them empty and Pathao reads the address. Pick them if Pathao says it cannot find the area.</div>
+          {!cities ? <Loading /> : (
+            <div className="row2">
+              <Field label="City"><select className="input" value={sel.city} onChange={(e) => pickCity(e.target.value)}><option value="">Auto</option>{cities.map((c) => <option key={c.city_id} value={c.city_id}>{c.city_name}</option>)}</select></Field>
+              <Field label="Zone"><select className="input" value={sel.zone} disabled={!zones.length} onChange={(e) => pickZone(e.target.value)}><option value="">Auto</option>{zones.map((z) => <option key={z.zone_id} value={z.zone_id}>{z.zone_name}</option>)}</select></Field>
+            </div>
+          )}
+          {areas.length > 0 && <Field label="Area"><select className="input" value={sel.area} onChange={(e) => setSel((s) => ({ ...s, area: e.target.value }))}><option value="">Auto</option>{areas.map((a) => <option key={a.area_id} value={a.area_id}>{a.area_name}</option>)}</select></Field>}
+        </>
+      )}
+      <div className="muted sm">Cash to collect is the order total for unpaid (COD) orders and 0 for paid ones. The order becomes “Shipped”.</div>
     </Modal>
   );
 }

@@ -76,7 +76,7 @@ export default function DashboardSection() {
   const lowStock = d.low_stock || [];
 
   const KPIS = [
-    { l: 'Total Revenue', v: money(d.paid_revenue), s: 'Paid orders', ic: 'wallet', c: 'var(--green)', bg: 'var(--green-l)' },
+    { l: 'Total Revenue', v: money(d.paid_revenue), s: d.refunded_total ? `After refunds (${money(d.refunded_total)} refunded)` : 'Paid orders, after refunds', ic: 'wallet', c: 'var(--green)', bg: 'var(--green-l)' },
     { l: 'Total Orders', v: num(totalOrders), s: `${num(d.orders_today)} today`, ic: 'cart', c: 'var(--blue)', bg: 'var(--blue-l)' },
     { l: 'Orders Today', v: num(d.orders_today), s: 'Since midnight (UTC)', ic: 'clock', c: 'var(--purple)', bg: 'var(--purple-l)' },
     { l: 'Pending Payments', v: num(d.pending_payment_checks), s: 'Need verification', ic: 'card', c: 'var(--amber)', bg: 'var(--amber-l)' },

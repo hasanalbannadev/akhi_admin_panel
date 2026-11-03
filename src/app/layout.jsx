@@ -3,7 +3,7 @@ import Providers from '@/components/Providers';
 import { AuthProvider } from '@/lib/auth';
 
 export const metadata = {
-  title: 'Akhi Lifestyle — Admin',
+  title: { default: 'Akhi Lifestyle - Admin Panel', template: 'Akhi Lifestyle - %s' },
   description: 'Admin panel for Akhi Lifestyle online shop',
 };
 

@@ -16,6 +16,7 @@ const NAV = [
   { href: '/inventory', label: 'Inventory', icon: 'package' },
   { sep: 'Sales' },
   { href: '/orders', label: 'Orders', icon: 'cart', badge: 'orders' },
+  { href: '/tracking', label: 'Order Tracking', icon: 'truck' },
   { href: '/payments', label: 'Payments', icon: 'card', badge: 'payments' },
   { href: '/payment-methods', label: 'Payment Accounts', icon: 'wallet' },
   { href: '/returns', label: 'Returns', icon: 'undo' },
@@ -42,33 +43,45 @@ export default function Shell({ children }) {
   const path = usePathname() || '';
   const { session, logout, isOwner } = useAuth();
   const [open, setOpen] = useState(false);
-  const [counts, setCounts] = useState({ chat: 0, notif: 0, payments: 0, support: 0 });
+  const [counts, setCounts] = useState({ chat: 0, notif: 0, payments: 0, support: 0, cancels: 0 });
   const [waiting, setWaiting] = useState([]);   // customers with messages you have not answered
   const [msgOpen, setMsgOpen] = useState(false);
   const popRef = useRef(null);
   const router = useRouter();
 
-  const refresh = useCallback(async () => {
+  const heavy = useRef(0);
+  // customer messages every 8 s (cheap); notifications / payments / messenger every ~32 s
+  const refresh = useCallback(async (force) => {
     try {
-      const [c, n, d, sp, th] = await Promise.all([
+      heavy.current += 1;
+      const full = force === true || heavy.current % 4 === 1;
+      const th = await api('/admin/support/threads').catch(() => []);
+      const list = (Array.isArray(th) ? th : []).filter((t) => t.unread > 0);
+      setWaiting(list);
+      setCounts((c) => ({ ...c, support: list.length }));
+      if (!full) return;
+      const [c, n, d] = await Promise.all([
         api('/admin/chat/unread-count').catch(() => ({ unread: 0 })),
         api('/admin/notifications', { query: { unread_only: true } }).catch(() => ({ unread: 0 })),
         api('/admin/dashboard').catch(() => ({ pending_payment_checks: 0 })),
-        api('/admin/support/unread').catch(() => ({ unread: 0 })),
-        api('/admin/support/threads').catch(() => []),
       ]);
-      setWaiting((Array.isArray(th) ? th : []).filter((t) => t.unread > 0));
-      setCounts({ chat: c.unread || 0, notif: n.unread || 0, payments: d.pending_payment_checks || 0, support: sp.unread || 0 });
+      setCounts((p) => ({ ...p, chat: c.unread || 0, notif: n.unread || 0, payments: d.pending_payment_checks || 0, cancels: d.cancel_requests || 0 }));
     } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 60000);
+    refresh(true);
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, 8000);
     return () => clearInterval(t);
   }, [refresh, path]);
 
   useEffect(() => { setOpen(false); setMsgOpen(false); }, [path]);
+  // pages tell the top bar the moment something was read / handled, so the counters drop to 0 at once
+  useEffect(() => {
+    const f = (e) => { if (e.detail) setCounts((c) => ({ ...c, ...e.detail })); refresh(true); };
+    window.addEventListener('badges-refresh', f);
+    return () => window.removeEventListener('badges-refresh', f);
+  }, [refresh]);
   useEffect(() => {
     if (!msgOpen) return undefined;
     const f = (e) => { if (popRef.current && !popRef.current.contains(e.target)) setMsgOpen(false); };
@@ -78,7 +91,7 @@ export default function Shell({ children }) {
 
   const base = '/' + (path.split('/')[1] || '');
   const title = TITLES[base] || 'Admin';
-  const badge = (k) => (k === 'payments' ? counts.payments : k === 'chat' ? counts.chat : k === 'support' ? counts.support : 0);
+  const badge = (k) => (k === 'payments' ? counts.payments : k === 'chat' ? counts.chat : k === 'support' ? counts.support : k === 'orders' ? counts.cancels : 0);
   const initials = (session?.username || 'A').slice(0, 1).toUpperCase();
 
   return (
@@ -110,7 +123,7 @@ export default function Shell({ children }) {
           <button className="iconbtn burger" onClick={() => setOpen(true)} aria-label="Menu"><Icon name="menu" /></button>
           <h1>{title}</h1>
           <div className="pop" ref={popRef}>
-            <button className="iconbtn" title="Customer messages" aria-label="Customer messages" aria-expanded={msgOpen} onClick={() => { setMsgOpen((o) => !o); refresh(); }}>
+            <button className="iconbtn" title="Customer messages" aria-label="Customer messages" aria-expanded={msgOpen} onClick={() => { setMsgOpen((o) => !o); refresh(true); }}>
               <Icon name="chat" />{waiting.length + counts.chat > 0 && <span className="dot">{waiting.length + counts.chat}</span>}
             </button>
             {msgOpen && (
@@ -118,7 +131,7 @@ export default function Shell({ children }) {
                 <div className="mh"><span>Unseen messages</span><span className="muted sm">{waiting.length} customer{waiting.length === 1 ? '' : 's'}</span></div>
                 <div className="mb">
                   {waiting.length === 0 ? <div className="muted" style={{ padding: 18, textAlign: 'center' }}>No unseen customer messages</div> : waiting.map((t) => (
-                    <a key={t.user_id} className="mi" href={`/support?u=${t.user_id}`} onClick={(e) => { e.preventDefault(); setMsgOpen(false); router.push(`/support?u=${t.user_id}`); setTimeout(() => window.dispatchEvent(new CustomEvent('support-open', { detail: t })), 50); }}>
+                    <a key={t.user_id} className="mi" href={`/support?u=${t.user_id}`} onClick={(e) => { e.preventDefault(); setMsgOpen(false); setWaiting((w) => w.filter((x) => x.user_id !== t.user_id)); router.push(`/support?u=${t.user_id}`); setTimeout(() => window.dispatchEvent(new CustomEvent('support-open', { detail: t })), 50); }}>
                       <div className="avatar">{(t.name || t.phone || '?').slice(0, 1).toUpperCase()}</div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div className="flex sp"><b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name || t.phone}</b><span className="muted sm">{timeAgo(t.last_at)}</span></div>

@@ -24,11 +24,26 @@ export default function SupportSection() {
 
   const threads = useAsync(() => api('/admin/support/threads'), []);
   const conv = useAsync(() => (sel ? api(`/admin/support/threads/${sel.user_id}`) : Promise.resolve(null)), [sel?.user_id]);
-  const msgs = conv.data?.messages || [];
+  const [live, setLive] = useState([]);
+  useEffect(() => { setLive(conv.data?.messages || []); if (conv.data) window.dispatchEvent(new CustomEvent('badges-refresh')); }, [conv.data]);
+  const msgs = live;
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.length, sel?.user_id]);
+  // every 3 s: only NEW messages of the open chat + the customer list; the full chat every ~20 s (catches deletes)
+  const tick = useRef(0);
   useEffect(() => {
-    const t = setInterval(() => { if (!document.hidden) { threads.reload(); if (sel) conv.reload(); } }, 20000);
+    const t = setInterval(async () => {
+      if (document.hidden) return;
+      tick.current += 1;
+      threads.reload();
+      if (!sel) return;
+      if (tick.current % 7 === 0) { conv.reload(); return; }
+      const last = live.length ? live[live.length - 1].id : 0;
+      try {
+        const r = await api(`/admin/support/threads/${sel.user_id}`, { query: last ? { after: last } : undefined });
+        if (r.messages?.length) setLive((m) => { const have = new Set(m.map((x) => x.id)); return [...m, ...r.messages.filter((x) => !have.has(x.id))]; });
+      } catch { /* next tick */ }
+    }, 3000);
     return () => clearInterval(t);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 

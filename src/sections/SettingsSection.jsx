@@ -20,6 +20,7 @@ export default function SettingsSection() {
   const [min, setMin] = useState('');
   const [social, setSocial] = useState({});
   const [busy, setBusy] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
   const [pw, setPw] = useState({ old_password: '', new_password: '', again: '' });
 
   useEffect(() => { if (data) { setMethods(data.payment_methods || {}); setMin(data.min_order_amount ?? ''); setSocial(data.social || {}); } }, [data]);
@@ -39,6 +40,14 @@ export default function SettingsSection() {
       await api('/admin/me/password', { method: 'POST', body: { old_password: pw.old_password, new_password: pw.new_password } });
       toast.ok('Password changed'); setPw({ old_password: '', new_password: '', again: '' });
     } catch (err) { toast.error(err.message); }
+  }
+
+  async function cleanImages() {
+    setCleaning(true);
+    try {
+      const r = await api('/admin/uploads/cleanup', { method: 'POST' });
+      toast.ok(r.removed ? `${r.removed} unused image(s) deleted, ${r.freed_kb} KB freed` : 'No unused images found');
+    } catch (err) { toast.error(err.message); } finally { setCleaning(false); }
   }
 
   if (loading && !data) return <Loading />;
@@ -64,6 +73,13 @@ export default function SettingsSection() {
             <Field key={k} label={l}><input className="input" disabled={!isOwner} value={social[k] || ''} onChange={(e) => setSocial((s) => ({ ...s, [k]: e.target.value }))} placeholder={k === 'whatsapp' ? '01XXXXXXXXX or https://wa.me/…' : 'https://…'} /></Field>
           ))}
           {isOwner && <button className="btn pri" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save settings'}</button>}
+          {isOwner && (
+            <div style={{ marginTop: 22, paddingTop: 14, borderTop: '1px solid var(--line, #eee)' }}>
+              <h4 style={{ marginBottom: 6 }}>Storage</h4>
+              <div className="muted sm" style={{ marginBottom: 8 }}>Deleted or replaced images are removed from the server automatically. This button also sweeps any old leftovers that nothing uses any more.</div>
+              <button className="btn" disabled={cleaning} onClick={cleanImages}>{cleaning ? 'Cleaning…' : 'Delete unused images'}</button>
+            </div>
+          )}
         </div>
       </div>
 
