@@ -13,7 +13,7 @@ import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 
 const KINDS = [['bkash', 'bKash'], ['nagad', 'Nagad'], ['rocket', 'Rocket'], ['upay', 'Upay'], ['bank', 'Bank account'], ['other', 'Other']];
-const BLANK = { kind: 'bkash', title: '', account_number: '', account_name: '', bank_name: '', branch: '', instructions: '', sort_order: 0, is_active: true };
+const BLANK = { kind: 'bkash', title: '', account_number: '', account_name: '', bank_name: '', branch: '', instructions: '', sort_order: 0, is_active: true, delivery_free: true };
 
 export default function PaymentMethodsSection() {
   const toast = useToast();
@@ -28,7 +28,7 @@ export default function PaymentMethodsSection() {
   const body = (m) => ({
     kind: m.kind, title: (m.title || '').trim(), account_number: (m.account_number || '').trim() || null, account_name: (m.account_name || '').trim() || null,
     bank_name: (m.bank_name || '').trim() || null, branch: (m.branch || '').trim() || null, instructions: (m.instructions || '').trim() || null,
-    sort_order: parseInt(m.sort_order, 10) || 0, is_active: !!m.is_active,
+    sort_order: parseInt(m.sort_order, 10) || 0, is_active: !!m.is_active, delivery_free: m.delivery_free !== false && m.delivery_free !== 'false',
   });
 
   async function save() {
@@ -56,7 +56,7 @@ export default function PaymentMethodsSection() {
       <div className="toolbar"><div className="muted">{rows.length} accounts</div><div className="grow" />
         <button className="btn pri" onClick={() => setEdit({ ...BLANK, sort_order: rows.length })}><Icon name="plus" size={16} /> Add account</button></div>
       <div className="infobox" style={{ marginBottom: 14 }}>
-        Customers who choose one of these pay <b>before</b> the order is confirmed and <b>no delivery charge</b> is added. When you check the TrxID and approve it in <b>Payments</b>, the order is confirmed and an SMS goes out.
+        Customers who choose one of these pay <b>before</b> the order is confirmed. Set each account to <b>Free delivery</b> or <b>With delivery charge</b>; the customer sees this label next to the method at checkout. (A product's own "Free delivery" ticks override it.) When you check the TrxID and approve it in <b>Payments</b>, the order is confirmed and an SMS goes out.
       </div>
       <ErrorBox error={error} onRetry={reload} />
       {loading && !data ? <Loading /> : rows.length === 0 ? <div className="card"><Empty icon="card" text="No payment accounts yet" /></div> : (
@@ -65,6 +65,7 @@ export default function PaymentMethodsSection() {
             <div className="card" key={m.id}>
               <div className="bd">
                 <div className="flex sp center"><b>{m.title}</b><Badge tone="pink">{(KINDS.find((k) => k[0] === m.kind) || [0, m.kind])[1]}</Badge></div>
+                <div style={{ margin: '4px 0' }}><Badge tone={m.delivery_free === false ? 'gray' : 'green'}>{m.delivery_free === false ? 'With delivery charge' : 'Free delivery'}</Badge></div>
                 {m.bank_name && <div className="muted sm">{m.bank_name}{m.branch ? `, ${m.branch}` : ''}</div>}
                 <div style={{ fontSize: 18, fontWeight: 700, margin: '6px 0', wordBreak: 'break-all' }}>{m.account_number}</div>
                 {m.account_name && <div className="muted sm">{m.account_name}</div>}
@@ -98,6 +99,15 @@ export default function PaymentMethodsSection() {
           <Field label="Account holder name"><input className="input" value={edit.account_name} onChange={set('account_name')} maxLength={100} /></Field>
           <Field label="Instructions (optional)" hint="e.g. Use Send Money, not Payment. Write the order number in the reference.">
             <textarea className="input" rows={3} value={edit.instructions} onChange={set('instructions')} maxLength={1000} />
+          </Field>
+          <Field label="Delivery charge for this payment method" hint="Shown to the customer at checkout next to this method.">
+            <div className="flex gap" style={{ flexWrap: 'wrap' }}>
+              {[[true, 'Free delivery'], [false, 'With delivery charge']].map(([k, v]) => (
+                <label key={String(k)} className="check" style={{ border: `2px solid ${(edit.delivery_free !== false) === k ? 'var(--pink)' : 'var(--line)'}`, borderRadius: 10, padding: '8px 12px' }}>
+                  <input type="radio" name="dfree" checked={(edit.delivery_free !== false) === k} onChange={() => setEdit((x) => ({ ...x, delivery_free: k }))} /> <b>{v}</b>
+                </label>
+              ))}
+            </div>
           </Field>
           <div className="row2">
             <Field label="Sort order"><input className="input" type="number" value={edit.sort_order} onChange={set('sort_order')} /></Field>

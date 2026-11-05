@@ -90,7 +90,13 @@ function render(inv, shop) {
   y += 40; hr(y);
   y += 26;
   text(`Payment: ${pay(inv.payment_method, inv.payment_label)} (${inv.payment_status === "paid" ? "Paid" : "Unpaid"})`, M, y, { size: 13, color: MUTED });
-  if (inv.tracking_code) text(`Tracking: ${inv.tracking_code}`, W - M, y, { size: 13, color: MUTED, align: "right" });
+  if (inv.tracking_code) {
+    let ty = y;
+    if (inv.courier) { text(`Courier: ${String(inv.courier).charAt(0).toUpperCase()}${String(inv.courier).slice(1)}`, W - M, ty, { size: 13, color: MUTED, align: "right" }); ty += 22; }
+    text(`Tracking: ${inv.tracking_code}`, W - M, ty, { size: 13, color: MUTED, align: "right" });
+    if (inv.consignment_id) { ty += 22; text(`Consignment: ${inv.consignment_id}`, W - M, ty, { size: 13, color: MUTED, align: "right" }); }
+    y = ty;
+  }
   y += 44;
   text(`Thank you for shopping with ${shop.name}!`, W / 2, y, { size: 13, color: MUTED, align: "center" });
 

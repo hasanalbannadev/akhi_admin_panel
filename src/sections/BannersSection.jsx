@@ -11,7 +11,7 @@ import { api, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 
 const BLANK = { title: '', image_url: '', link_url: '', sort_order: 0, is_active: true, placement: 'hero', subtitle: '', button_text: '' };
-const PLACE = { hero: 'Top slider (home page)', promo: 'Offer strip (between product rows)' };
+const PLACE = { hero: 'Top slider (home page)', promo: 'Offer strip (below the products, above the footer)' };
 
 export default function BannersSection() {
   const toast = useToast();
