@@ -22,15 +22,10 @@ export default function ChatSection() {
   const [sending, setSending] = useState(false);
   const endRef = useRef(null);
 
-  const threads = useAsync(() => api('/admin/chat/threads', { query: { unread_only: unreadOnly, page, page_size: 30 } }), [unreadOnly, page]);
-  const msgs = useAsync(() => (sel ? api(`/admin/chat/threads/${sel.id}/messages`) : Promise.resolve([])), [sel?.id]);
+  const threads = useAsync(() => api('/admin/chat/threads', { query: { unread_only: unreadOnly, page, page_size: 30 } }), [unreadOnly, page], { every: 2000 });
+  const msgs = useAsync(() => (sel ? api(`/admin/chat/threads/${sel.id}/messages`) : Promise.resolve([])), [sel?.id], { every: 1000 });
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.data]);
-  // light polling so new messages appear
-  useEffect(() => {
-    const t = setInterval(() => { threads.reload(); if (sel) msgs.reload(); }, 20000);
-    return () => clearInterval(t);
-  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function send(e) {
     e.preventDefault();

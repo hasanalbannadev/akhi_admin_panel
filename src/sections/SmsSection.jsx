@@ -168,7 +168,7 @@ function Send({ done }) {
 }
 
 function Campaigns() {
-  const list = useAsync(() => api('/admin/sms/campaigns'), []);
+  const list = useAsync(() => api('/admin/sms/campaigns'), [], { every: 0 });
   const [open, setOpen] = useState(null);
   const rows = list.data || [];
   const running = rows.some((c) => c.status === 'running');

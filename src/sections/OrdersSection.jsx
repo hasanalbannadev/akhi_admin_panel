@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
 import FlowTracker from '@/components/FlowTracker';
+import InvoiceModal from '@/components/InvoiceModal';
 import { Badge, DataTable, Empty, ErrorBox, Field, Loading, Modal, Pager, SearchBox } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, download } from '@/lib/api';
@@ -73,14 +74,17 @@ export default function OrdersSection() {
     catch (e) { toast.error(e.message); }
   }
 
-  async function syncCourier() {
+  async function syncCourier(which = 'all') {
+    setSyncMenu(false);
     setCBusy(true);
     try {
-      const r = await api('/admin/courier/sync', { method: 'POST' });
+      const r = await api('/admin/courier/sync', { method: 'POST', query: { courier: which } });
       if (r.error) toast.error(`Stopped: ${r.error}`);
       toast.ok(`Checked ${r.checked} parcel(s), ${r.updated} updated`); list.reload();
     } catch (e) { toast.error(e.message); } finally { setCBusy(false); }
   }
+  const [syncMenu, setSyncMenu] = useState(false);
+  const [inv, setInv] = useState(null);
   async function showBalance() {
     setCBusy(true);
     try { setBal(await api('/admin/courier/balance')); } catch (e) { toast.error(e.message); } finally { setCBusy(false); }
@@ -98,7 +102,7 @@ export default function OrdersSection() {
     { h: 'Payment', cell: (o) => <div><div className="sm">{methodName(o.payment_method, o.payment_label)}</div><Pay o={o} /></div> },
     { h: 'Courier', cell: (o) => o.courier_status ? <Badge tone={courierTone(o.courier_status)}>{label(o.courier_status)}</Badge> : <span className="muted sm">—</span> },
     { h: 'Status', cell: (o) => <Pill o={o} /> },
-    { h: '', cls: 'r', cell: (o) => <button className="btn sm" onClick={() => setOpen(o.order_no)}><Icon name="eye" size={14} /> View</button> },
+    { h: '', cls: 'r', cell: (o) => <div className="acts"><button className="btn sm" onClick={() => setOpen(o.order_no)}><Icon name="eye" size={14} /> View</button><button className="btn sm" title="Invoice" onClick={() => setInv(o.order_no)}><Icon name="print" size={14} /></button></div> },
   ];
 
   return (
@@ -116,7 +120,19 @@ export default function OrdersSection() {
         </select>
         <label className="check"><input type="checkbox" checked={cr} onChange={(e) => { setCr(e.target.checked); setPage(1); setSel([]); }} /> Cancel requests</label>
         <div className="grow" />
-        <button className="btn" disabled={cBusy} onClick={syncCourier}><Icon name="refresh" size={15} /> Sync courier</button>
+        <div style={{ position: 'relative' }}>
+          <button className="btn" disabled={cBusy} onClick={() => setSyncMenu((v) => !v)}><Icon name="refresh" size={15} /> Sync courier ▾</button>
+          {syncMenu && (
+            <>
+              <div onClick={() => setSyncMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+              <div className="card" style={{ position: 'absolute', right: 0, top: '110%', zIndex: 41, minWidth: 190, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,.15)' }}>
+                {[['all', 'All couriers'], ['steadfast', 'Steadfast only'], ['pathao', 'Pathao only']].map(([k, v]) => (
+                  <button key={k} className="btn" style={{ width: '100%', justifyContent: 'flex-start', border: 0 }} onClick={() => syncCourier(k)}>{v}</button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <button className="btn" disabled={cBusy} onClick={showBalance}><Icon name="truck" size={15} /> Courier balance</button>
         <button className="btn" onClick={() => setExp(true)}><Icon name="download" size={15} /> Export CSV</button>
       </div>
@@ -143,13 +159,15 @@ export default function OrdersSection() {
               <div onClick={() => setOpen(o.order_no)}>
                 <div className="flex sp center"><b>{o.order_no}</b><b>{money(o.total)}</b></div>
                 <div className="muted sm">{o.ship_name} · {o.ship_phone}</div>
-                <div className="flex gap wrap" style={{ marginTop: 8 }}><Pill o={o} /><Pay o={o} /><span className="muted sm">{dt(o.created_at)}</span></div>
+                <div className="flex gap wrap" style={{ marginTop: 8 }}><Pill o={o} /><Pay o={o} /><span className="muted sm">{dt(o.created_at)}</span><button className="btn sm" onClick={(e) => { e.stopPropagation(); setInv(o.order_no); }}>Invoice</button></div>
               </div>
             )} />
             <Pager page={page} pageSize={PAGE} total={list.data?.total} count={(list.data?.items || []).length} onPage={(p) => { setPage(p); setSel([]); }} />
           </>
         )}
       </div></div>
+
+      {inv && <InvoiceModal orderNo={inv} onClose={() => setInv(null)} />}
 
       {bal && (
         <Modal title="Steadfast balance" onClose={() => setBal(null)} footer={<button className="btn" onClick={() => setBal(null)}>Close</button>}>
@@ -184,7 +202,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [sf, setSf] = useState(null);
   const [extra, setExtra] = useState(null);   // {title, data} for tracking history / customer check
-  const [invoice, setInvoice] = useState(null);
+  const [invoice, setInvoice] = useState(false);
 
   useEffect(() => { if (o) { setStatus(o.status); setCourier(o.courier || ''); setTrack(o.tracking_code || ''); } }, [o]);
 
@@ -217,9 +235,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
   async function customerCheck() {
     try { setExtra({ title: `Customer record (${o.ship_phone})`, data: await api(`/admin/courier/fraud/${o.ship_phone}`) }); } catch (e) { toast.error(e.message); }
   }
-  async function showInvoice() {
-    try { setInvoice(await api(`/admin/orders/${orderNo}/invoice`)); } catch (e) { toast.error(e.message); }
-  }
+  const showInvoice = () => setInvoice(true);
 
   return (
     <Modal title={`Order ${orderNo}`} size="wide" onClose={onClose}>
@@ -291,32 +307,10 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
         </div>
       </>)}
       {sendDlg && <SendCourier orderNo={orderNo} onClose={() => setSendDlg(false)} onDone={() => { setSendDlg(false); reload(); onChanged(); }} />}
-      {invoice && <Invoice inv={invoice} onClose={() => setInvoice(null)} />}
+      {invoice && <InvoiceModal orderNo={orderNo} onClose={() => setInvoice(false)} />}
     </Modal>
   );
 }
-
-function Invoice({ inv, onClose }) {
-  return (
-    <Modal title={`Invoice ${inv.invoice_no}`} onClose={onClose} footer={<><button className="btn" onClick={onClose}>Close</button><button className="btn pri" onClick={() => window.print()}><Icon name="print" size={15} /> Print</button></>}>
-      <div id="invoice">
-        <div className="flex sp"><div><b style={{ fontSize: 18 }}>Akhi Lifestyle</b><div className="muted sm">Invoice {inv.invoice_no}</div></div><div className="muted sm">{dt(inv.date)}</div></div>
-        <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '14px 0' }} />
-        <div className="sm"><b>{inv.customer.name}</b> · {inv.customer.phone}<br />{inv.ship_to.address}, {inv.ship_to.area ? `${inv.ship_to.area}, ` : ''}{inv.ship_to.district}</div>
-        <table className="tbl compact" style={{ margin: '14px 0', minWidth: 0 }}>
-          <thead><tr><th>Item</th><th className="r">Qty</th><th className="r">Price</th><th className="r">Total</th></tr></thead>
-          <tbody>{inv.items.map((i, k) => <tr key={k}><td>{i.name}</td><td className="r">{i.quantity}</td><td className="r">{money(i.unit_price)}</td><td className="r">{money(i.line_total)}</td></tr>)}</tbody>
-        </table>
-        <div className="sum-row"><span>Subtotal</span><span>{money(inv.subtotal)}</span></div>
-        <div className="sum-row"><span>Discount</span><span>−{money(inv.discount)}</span></div>
-        <div className="sum-row"><span>Shipping</span><span>{money(inv.shipping_fee)}</span></div>
-        <div className="sum-row tot"><span>Total</span><span>{money(inv.total)}</span></div>
-        <div className="muted sm" style={{ marginTop: 10 }}>{METHOD_LABEL[inv.payment_method]} · {label(inv.payment_status)}</div>
-      </div>
-    </Modal>
-  );
-}
-
 
 /* ----------------------------- order progress (filled circle = reached) ----------------------------- */
 const STEPS = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];

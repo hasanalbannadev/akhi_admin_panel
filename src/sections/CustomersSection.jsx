@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
+import InvoiceModal from '@/components/InvoiceModal';
 import { Badge, DataTable, Empty, ErrorBox, Loading, Modal, Pager, SearchBox } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, download } from '@/lib/api';
@@ -76,6 +77,7 @@ export default function CustomersSection() {
 function CustomerDetail({ id, onClose, onBlock }) {
   const d = useAsync(() => api(`/admin/customers/${id}`), [id]);
   const o = useAsync(() => api(`/admin/customers/${id}/orders`), [id]);
+  const [inv, setInv] = useState(null);
   const c = d.data;
   return (
     <Modal title="Customer" size="wide" onClose={onClose}>
@@ -101,8 +103,9 @@ function CustomerDetail({ id, onClose, onBlock }) {
           ))}
           <h4 style={{ margin: '18px 0 6px' }}>Order history</h4>
           {o.loading ? <Loading /> : (o.data || []).length === 0 ? <div className="muted sm">No orders</div> : o.data.map((x) => (
-            <div className="list-item" key={x.order_no}><div className="grow"><b>{x.order_no}</b><span className="muted sm">{dt(x.created_at)}</span></div><Badge tone={ORDER_TONE[x.status]}>{label(x.status)}</Badge><b>{money(x.total)}</b></div>
+            <div className="list-item" key={x.order_no}><div className="grow"><b>{x.order_no}</b><span className="muted sm">{dt(x.created_at)}</span></div><Badge tone={ORDER_TONE[x.status]}>{label(x.status)}</Badge><b>{money(x.total)}</b><button className="btn sm" onClick={() => setInv(x.order_no)}>Invoice</button></div>
           ))}
+          {inv && <InvoiceModal orderNo={inv} onClose={() => setInv(null)} />}
         </div>
       )}
     </Modal>

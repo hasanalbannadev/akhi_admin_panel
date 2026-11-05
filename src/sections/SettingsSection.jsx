@@ -15,7 +15,7 @@ import { METHOD_LABEL } from '@/lib/format';
 export default function SettingsSection() {
   const { isOwner, session } = useAuth();
   const toast = useToast();
-  const { data, loading, error, reload } = useAsync(() => api('/admin/settings'), []);
+  const { data, loading, error, reload } = useAsync(() => api('/admin/settings'), [], { every: 0 });
   const [methods, setMethods] = useState({});
   const [min, setMin] = useState('');
   const [social, setSocial] = useState({});

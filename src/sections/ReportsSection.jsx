@@ -22,7 +22,7 @@ export default function ReportsSection() {
   const profit = useAsync(() => own(() => api('/admin/reports/profit', { query: { days } })), [days, isOwner]);
   const top = useAsync(() => own(() => api('/admin/reports/top-customers', { query: { days } })), [days, isOwner]);
   const summary = useAsync(() => api('/admin/reports/orders-summary', { query: { days } }), [days]);
-  const low = useAsync(() => api('/admin/reports/low-stock', { query: { threshold: 5 } }), []);
+  const low = useAsync(() => api('/admin/reports/low-stock', { query: { threshold: 5 } }), [], { every: 30000 });
 
   const pts = (sales.data?.daily || []).map((r) => ({ label: r.date.slice(5).replace('-', '/'), full: r.date, value: r.revenue, extra: `${r.orders} orders` }));
   const revenue = pts.reduce((a, p) => a + p.value, 0);

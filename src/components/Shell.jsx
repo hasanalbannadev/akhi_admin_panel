@@ -71,7 +71,7 @@ export default function Shell({ children }) {
 
   useEffect(() => {
     refresh(true);
-    const t = setInterval(() => { if (!document.hidden) refresh(); }, 8000);
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, 5000);
     return () => clearInterval(t);
   }, [refresh, path]);
 

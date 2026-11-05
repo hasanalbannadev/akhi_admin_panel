@@ -25,7 +25,7 @@ import { getParam, money, num, slugify } from '@/lib/format';
 const PAGE = 20;
 const EMPTY = {
   name: '', slug: '', category_id: '', description: '', price: '', compare_at_price: '', cost_price: '',
-  stock: 0, sku: '', is_active: true,
+  stock: 0, sku: '', is_active: true, free_delivery_methods: [],
 };
 
 export default function ProductsSection() {
@@ -149,8 +149,11 @@ function ProductForm({ id, onDone }) {
   const [idMap, setIdMap] = useState({});          // url -> image id (edit mode)
   const [slugTouched, setSlugTouched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const pms = useAsync(() => api('/admin/payment-methods'), [], { every: 0 });
+  const payOpts = [['cod', 'Cash on delivery'], ['sslcommerz', 'Online payment (SSLCommerz)'], ...((pms.data || []).filter((m) => m.is_active).map((m) => [`pm_${m.id}`, m.title]))];
+  const toggleFree = (k) => setF((x) => ({ ...x, free_delivery_methods: x.free_delivery_methods.includes(k) ? x.free_delivery_methods.filter((y) => y !== k) : [...x.free_delivery_methods, k] }));
   const cats = useAsync(() => api('/admin/categories'), []);
-  const loaded = useAsync(() => (id ? api(`/admin/products/${id}`) : Promise.resolve(null)), [id]);
+  const loaded = useAsync(() => (id ? api(`/admin/products/${id}`) : Promise.resolve(null)), [id], { every: 0 });
 
   useEffect(() => {
     const p = loaded.data;
@@ -158,7 +161,7 @@ function ProductForm({ id, onDone }) {
     setF({
       name: p.name, slug: p.slug, category_id: p.category_id ?? '', description: p.description || '',
       price: p.price, compare_at_price: p.compare_at_price ?? '', cost_price: p.cost_price ?? '',
-      stock: p.stock, sku: p.sku || '', is_active: p.is_active,
+      stock: p.stock, sku: p.sku || '', is_active: p.is_active, free_delivery_methods: p.free_delivery_methods || [],
     });
     const imgs = [...(p.images || [])].sort((a, b) => a.sort_order - b.sort_order);
     setImages(imgs.map((i) => i.url));
@@ -209,7 +212,7 @@ function ProductForm({ id, onDone }) {
       compare_at_price: f.compare_at_price === '' ? null : Number(f.compare_at_price),
       cost_price: f.cost_price === '' ? null : Number(f.cost_price),
       stock: colors.length ? colorStock : Math.max(0, parseInt(f.stock, 10) || 0), sku: f.sku.trim() || null,
-      is_active: !!f.is_active, image_urls: images,
+      is_active: !!f.is_active, free_delivery_methods: f.free_delivery_methods || [], image_urls: images,
       colors: colors.map((c) => ({
         ...(c.id ? { id: c.id } : {}), name: c.name.trim(), hex: c.hex || null,
         stock: Math.max(0, parseInt(c.stock, 10) || 0), images: c.images,
@@ -293,6 +296,12 @@ function ProductForm({ id, onDone }) {
               <Field label="SKU"><input className="input" value={f.sku} onChange={set('sku')} /></Field>
             </div>
             <label className="check"><input type="checkbox" checked={f.is_active} onChange={set('is_active')} /> Visible in the shop</label>
+          </div></div>
+          <div className="card"><div className="hd"><h3>Free delivery</h3></div><div className="bd">
+            <div className="muted sm" style={{ marginBottom: 8 }}>Tick the payment methods for which this product has <b>no delivery charge</b>. Customers see this on the product page. Leave all unticked to use the normal rule (online/bKash/Nagad payments ship free, cash on delivery pays the delivery charge). If the cart has several products, delivery is free only when every product allows it.</div>
+            {payOpts.map(([k, v]) => (
+              <label key={k} className="check" style={{ display: 'flex', marginBottom: 6 }}><input type="checkbox" checked={f.free_delivery_methods.includes(k)} onChange={() => toggleFree(k)} /> {v}</label>
+            ))}
           </div></div>
         </div>
       </div>

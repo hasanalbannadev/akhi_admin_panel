@@ -22,8 +22,8 @@ export default function SupportSection() {
   const [sending, setSending] = useState(false);
   const endRef = useRef(null);
 
-  const threads = useAsync(() => api('/admin/support/threads'), []);
-  const conv = useAsync(() => (sel ? api(`/admin/support/threads/${sel.user_id}`) : Promise.resolve(null)), [sel?.user_id]);
+  const threads = useAsync(() => api('/admin/support/threads'), [], { every: 0 });
+  const conv = useAsync(() => (sel ? api(`/admin/support/threads/${sel.user_id}`) : Promise.resolve(null)), [sel?.user_id], { every: 0 });
   const [live, setLive] = useState([]);
   useEffect(() => { setLive(conv.data?.messages || []); if (conv.data) window.dispatchEvent(new CustomEvent('badges-refresh')); }, [conv.data]);
   const msgs = live;
@@ -37,13 +37,13 @@ export default function SupportSection() {
       tick.current += 1;
       threads.reload();
       if (!sel) return;
-      if (tick.current % 7 === 0) { conv.reload(); return; }
+      if (tick.current % 20 === 0) { conv.reload(); return; }
       const last = live.length ? live[live.length - 1].id : 0;
       try {
         const r = await api(`/admin/support/threads/${sel.user_id}`, { query: last ? { after: last } : undefined });
         if (r.messages?.length) setLive((m) => { const have = new Set(m.map((x) => x.id)); return [...m, ...r.messages.filter((x) => !have.has(x.id))]; });
       } catch { /* next tick */ }
-    }, 3000);
+    }, 1000);
     return () => clearInterval(t);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 

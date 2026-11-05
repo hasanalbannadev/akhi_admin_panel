@@ -5,13 +5,15 @@
  */
 import { useState } from 'react';
 import Icon from '@/components/Icon';
-import { Badge, DataTable, Empty, ErrorBox, Field, Loading, Modal } from '@/components/ui';
+import { Badge, DataTable, Empty, ErrorBox, Field, ImageUploader, Loading, Modal, Switch } from '@/components/ui';
+import ScopePicker from '@/components/ScopePicker';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { dt, money, toLocalInput } from '@/lib/format';
 
-const BLANK = { code: '', kind: 'percent', value: '', min_subtotal: 0, max_discount: '', usage_limit: '', per_user_limit: 1, starts_at: '', expires_at: '', is_active: true };
+const BLANK = { code: '', kind: 'percent', value: '', min_subtotal: 0, max_discount: '', usage_limit: '', per_user_limit: 1, starts_at: '', expires_at: '', is_active: true,
+  scope: 'all', product_ids: [], category_ids: [], popup_enabled: false, popup_title: '', popup_text: '', popup_image: [], popup_button_text: '', popup_link: '', popup_seconds: 2 };
 
 export default function CouponsSection() {
   const toast = useToast();
@@ -25,7 +27,9 @@ export default function CouponsSection() {
     if (!c) return setEdit({ ...BLANK });
     try { // GET /admin/coupons/{id} so the form always has the freshest values
       const f = await api(`/admin/coupons/${c.id}`);
-      setEdit({ ...BLANK, ...f, max_discount: f.max_discount ?? '', usage_limit: f.usage_limit ?? '', starts_at: toLocalInput(f.starts_at), expires_at: toLocalInput(f.expires_at) });
+      setEdit({ ...BLANK, ...f, max_discount: f.max_discount ?? '', usage_limit: f.usage_limit ?? '', starts_at: toLocalInput(f.starts_at), expires_at: toLocalInput(f.expires_at),
+        popup_title: f.popup_title || '', popup_text: f.popup_text || '', popup_button_text: f.popup_button_text || '', popup_link: f.popup_link || '',
+        popup_image: f.popup_image ? [f.popup_image] : [], product_ids: f.product_ids || [], category_ids: f.category_ids || [] });
     } catch (e) { toast.error(e.message); }
   }
   const set = (k) => (e) => setEdit((s) => ({ ...s, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -43,7 +47,13 @@ export default function CouponsSection() {
       starts_at: edit.starts_at ? new Date(edit.starts_at).toISOString() : null,
       expires_at: edit.expires_at ? new Date(edit.expires_at).toISOString() : null,
       is_active: !!edit.is_active,
+      scope: edit.scope, product_ids: edit.scope === 'products' ? edit.product_ids : [], category_ids: edit.scope === 'categories' ? edit.category_ids : [],
+      popup_enabled: !!edit.popup_enabled, popup_title: edit.popup_title.trim() || null, popup_text: edit.popup_text.trim() || null,
+      popup_image: edit.popup_image[0] || null, popup_button_text: edit.popup_button_text.trim() || null, popup_link: edit.popup_link.trim() || null,
+      popup_seconds: Math.min(30, Math.max(1, parseInt(edit.popup_seconds, 10) || 2)),
     };
+    if (edit.scope === 'products' && !body.product_ids.length) return toast.error('Select at least one product');
+    if (edit.scope === 'categories' && !body.category_ids.length) return toast.error('Select at least one category');
     setBusy(true);
     try {
       if (edit.id) await api(`/admin/coupons/${edit.id}`, { method: 'PUT', body });
@@ -67,6 +77,7 @@ export default function CouponsSection() {
   const columns = [
     { h: 'Code', cell: (c) => <b style={{ letterSpacing: '.04em' }}>{c.code}</b> },
     { h: 'Discount', cell: (c) => <div>{val(c)}{c.max_discount ? <div className="muted sm">max {money(c.max_discount)}</div> : null}</div> },
+    { h: 'Applies to', cell: (c) => <span className="muted sm">{c.scope === 'products' ? `${(c.product_ids || []).length} products` : c.scope === 'categories' ? `${(c.category_ids || []).length} categories` : 'All products'}</span> },
     { h: 'Min order', cell: (c) => (c.min_subtotal ? money(c.min_subtotal) : '—') },
     { h: 'Used', cell: (c) => `${c.used_count}${c.usage_limit ? ` / ${c.usage_limit}` : ''}` },
     { h: 'Valid until', cell: (c) => <span className="muted">{c.expires_at ? dt(c.expires_at, false) : 'No expiry'}</span> },
@@ -118,7 +129,25 @@ export default function CouponsSection() {
             <Field label="Starts"><input className="input" type="datetime-local" value={edit.starts_at} onChange={set('starts_at')} /></Field>
             <Field label="Expires"><input className="input" type="datetime-local" value={edit.expires_at} onChange={set('expires_at')} /></Field>
           </div>
+          <ScopePicker value={edit} onChange={(v) => setEdit((s) => ({ ...s, ...v }))} />
+          <div className="hint muted sm" style={{ margin: '-4px 0 10px' }}>While this coupon is active and valid, products it covers do not get their offer price at checkout; offers return when the coupon ends.</div>
           <label className="check"><input type="checkbox" checked={edit.is_active} onChange={set('is_active')} /> Active</label>
+
+          <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '16px 0' }} />
+          <div className="flex sp center"><b>Pop-up banner on the website</b><Switch checked={!!edit.popup_enabled} onChange={(v) => setEdit((s) => ({ ...s, popup_enabled: v }))} /></div>
+          <div className="muted sm" style={{ margin: '4px 0 10px' }}>A small overlay shown once per visit while the coupon is active. Customers can copy the code or close it.</div>
+          {edit.popup_enabled && (
+            <>
+              <Field label="Title"><input className="input" value={edit.popup_title} onChange={set('popup_title')} maxLength={120} placeholder="Special coupon for you!" /></Field>
+              <Field label="Text"><input className="input" value={edit.popup_text} onChange={set('popup_text')} maxLength={200} placeholder="Use this code at checkout" /></Field>
+              <Field label="Image (optional)"><ImageUploader single value={edit.popup_image} onChange={(v) => setEdit((s) => ({ ...s, popup_image: v }))} /></Field>
+              <div className="row2">
+                <Field label="Button text"><input className="input" value={edit.popup_button_text} onChange={set('popup_button_text')} maxLength={40} placeholder="Shop now" /></Field>
+                <Field label="Button link"><input className="input" value={edit.popup_link} onChange={set('popup_link')} maxLength={300} placeholder="/products" /></Field>
+              </div>
+              <Field label="Show for (seconds)" hint="Then it closes by itself. 1–30."><input className="input" type="number" min="1" max="30" value={edit.popup_seconds} onChange={set('popup_seconds')} /></Field>
+            </>
+          )}
         </Modal>
       )}
     </div>

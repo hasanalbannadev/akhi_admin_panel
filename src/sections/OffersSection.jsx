@@ -5,26 +5,18 @@
  *       GET /admin/products (picker)
  * The percent is taken off the product's COMPARE price (default) or its selling price.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Icon from '@/components/Icon';
+import ScopePicker from '@/components/ScopePicker';
 import { Badge, Empty, ErrorBox, Field, ImageUploader, Loading, Modal, Switch } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { dt, money, toLocalInput } from '@/lib/format';
 
-const BLANK = { title: '', banner: [], percent: 10, apply_on: 'compare', starts_at: '', ends_at: '', is_active: true, sort_order: 0, product_ids: [] };
+const BLANK = { title: '', banner: [], percent: 10, apply_on: 'compare', starts_at: '', ends_at: '', is_active: true, sort_order: 0, product_ids: [], category_ids: [], scope: 'products', subtitle: '', button_text: '', link_url: '' };
 const TONE = { live: 'green', scheduled: 'amber', expired: 'red', off: 'gray' };
 const LABEL = { live: 'Live', scheduled: 'Scheduled', expired: 'Expired', off: 'Off' };
-
-/** same rule as the backend: new price must be lower than the selling price */
-function offerPrice(p, percent, applyOn) {
-  const price = Number(p.price || 0);
-  const cmp = Number(p.compare_at_price || 0);
-  const base = applyOn === 'compare' && cmp > 0 ? cmp : price;
-  const now = Math.round(base * (1 - percent / 100) * 100) / 100;
-  return now > 0 && now < price ? now : null;
-}
 
 export default function OffersSection() {
   const toast = useToast();
@@ -32,21 +24,14 @@ export default function OffersSection() {
   const { data, loading, error, reload } = useAsync(() => api('/admin/offers'), []);
   const [edit, setEdit] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [q, setQ] = useState('');
   const rows = data || [];
 
-  const prods = useAsync(() => (edit ? api('/admin/products', { query: { page_size: 100 } }).catch(() => ({ items: [] })) : Promise.resolve(null)), [!!edit]);
-  const all = prods.data?.items || [];
-  const shown = useMemo(() => all.filter((p) => !q.trim() || p.name.toLowerCase().includes(q.trim().toLowerCase())), [all, q]);
-  const byId = useMemo(() => Object.fromEntries(all.map((p) => [p.id, p])), [all]);
 
   function open(o) {
-    setQ('');
     if (!o) return setEdit({ ...BLANK });
-    setEdit({ ...BLANK, ...o, banner: o.banner_url ? [o.banner_url] : [], starts_at: toLocalInput(o.starts_at), ends_at: toLocalInput(o.ends_at), product_ids: o.product_ids || [] });
+    setEdit({ ...BLANK, ...o, banner: o.banner_url ? [o.banner_url] : [], starts_at: toLocalInput(o.starts_at), ends_at: toLocalInput(o.ends_at), product_ids: o.product_ids || [], category_ids: o.category_ids || [], scope: o.scope || 'products', subtitle: o.subtitle || '', button_text: o.button_text || '', link_url: o.link_url || '' });
   }
   const set = (k) => (e) => setEdit((s) => ({ ...s, [k]: e.target.value }));
-  const toggle = (id) => setEdit((s) => ({ ...s, product_ids: s.product_ids.includes(id) ? s.product_ids.filter((x) => x !== id) : [...s.product_ids, id] }));
 
   async function save() {
     const percent = parseInt(edit.percent, 10);
@@ -57,8 +42,12 @@ export default function OffersSection() {
       title: edit.title.trim(), banner_url: edit.banner[0] || null, percent, apply_on: edit.apply_on,
       starts_at: edit.starts_at ? new Date(edit.starts_at).toISOString() : null,
       ends_at: edit.ends_at ? new Date(edit.ends_at).toISOString() : null,
-      is_active: !!edit.is_active, sort_order: parseInt(edit.sort_order, 10) || 0, product_ids: edit.product_ids,
+      is_active: !!edit.is_active, sort_order: parseInt(edit.sort_order, 10) || 0,
+      scope: edit.scope, product_ids: edit.scope === 'products' ? edit.product_ids : [], category_ids: edit.scope === 'categories' ? edit.category_ids : [],
+      subtitle: edit.subtitle.trim() || null, button_text: edit.button_text.trim() || null, link_url: edit.link_url.trim() || null,
     };
+    if (edit.scope === 'products' && !body.product_ids.length) return toast.error('Select at least one product');
+    if (edit.scope === 'categories' && !body.category_ids.length) return toast.error('Select at least one category');
     setBusy(true);
     try {
       if (edit.id) await api(`/admin/offers/${edit.id}`, { method: 'PUT', body });
@@ -73,8 +62,6 @@ export default function OffersSection() {
     if (!(await confirm({ title: 'Delete offer?', text: `"${o.title}" will be removed and its banner file deleted. Product prices go back to normal.`, confirmText: 'Delete', danger: true }))) return;
     try { await api(`/admin/offers/${o.id}`, { method: 'DELETE' }); toast.ok('Offer deleted'); reload(); } catch (e) { toast.error(e.message); }
   }
-
-  const noDiscount = edit ? edit.product_ids.filter((id) => byId[id] && offerPrice(byId[id], Number(edit.percent) || 0, edit.apply_on) === null).length : 0;
 
   return (
     <div>
@@ -94,7 +81,7 @@ export default function OffersSection() {
                   <Badge tone={TONE[o.status] || 'gray'}>{LABEL[o.status] || o.status}</Badge>
                 </div>
                 <div className="muted sm" style={{ margin: '6px 0 10px' }}>
-                  {o.percent}% off {o.apply_on === 'compare' ? 'compare price' : 'selling price'} · {o.product_count} products
+                  {o.percent}% off {o.apply_on === 'compare' ? 'compare price' : 'selling price'} · {o.scope === 'all' ? 'all products' : o.scope === 'categories' ? `${(o.category_ids || []).length} categories · ${o.product_count} products` : `${o.product_count} products`}
                   <br />{o.starts_at ? dt(o.starts_at) : 'Starts now'} → {o.ends_at ? dt(o.ends_at) : 'No end'}
                 </div>
                 <div className="flex sp center" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -115,6 +102,11 @@ export default function OffersSection() {
           footer={<><button className="btn" onClick={() => setEdit(null)}>Cancel</button><button className="btn pri" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save offer'}</button></>}>
           <Field label="Title *"><input className="input" value={edit.title} onChange={set('title')} placeholder="Eid Sale" autoFocus /></Field>
           <Field label="Banner image" hint="Wide image works best (about 1200×450)."><ImageUploader single value={edit.banner} onChange={(v) => setEdit((s) => ({ ...s, banner: v }))} /></Field>
+          <Field label="Banner sub-text (optional)"><input className="input" value={edit.subtitle} onChange={set('subtitle')} maxLength={200} placeholder="Up to 50% off this week" /></Field>
+          <div className="row2">
+            <Field label="Button text (optional)"><input className="input" value={edit.button_text} onChange={set('button_text')} maxLength={40} placeholder="Shop now" /></Field>
+            <Field label="Button link (optional)" hint="Empty = opens this offer's products."><input className="input" value={edit.link_url} onChange={set('link_url')} maxLength={300} placeholder="/products" /></Field>
+          </div>
           <div className="row2">
             <Field label="Discount percent *"><input className="input" type="number" min="1" max="90" value={edit.percent} onChange={set('percent')} /></Field>
             <Field label="Apply percent on" hint="Compare price = the crossed-out “old” price.">
@@ -133,31 +125,7 @@ export default function OffersSection() {
             <Field label="Visible"><div className="check"><Switch checked={!!edit.is_active} onChange={(v) => setEdit((s) => ({ ...s, is_active: v }))} /> <span>{edit.is_active ? 'On' : 'Off'}</span></div></Field>
           </div>
 
-          <Field label={`Products (${edit.product_ids.length} selected)`}>
-            <input className="input" placeholder="Search products…" value={q} onChange={(e) => setQ(e.target.value)} />
-            <div className="flex gap" style={{ margin: '8px 0' }}>
-              <button type="button" className="btn sm" onClick={() => setEdit((s) => ({ ...s, product_ids: [...new Set([...s.product_ids, ...shown.map((p) => p.id)])] }))}>Select shown</button>
-              <button type="button" className="btn sm" onClick={() => setEdit((s) => ({ ...s, product_ids: [] }))}>Clear</button>
-            </div>
-            <div style={{ maxHeight: 280, overflow: 'auto', border: '1px solid var(--line)', borderRadius: 10 }}>
-              {prods.loading && !prods.data ? <Loading /> : shown.length === 0 ? <div className="muted sm" style={{ padding: 14 }}>No products found</div> : shown.map((p) => {
-                const on = edit.product_ids.includes(p.id);
-                const np = offerPrice(p, Number(edit.percent) || 0, edit.apply_on);
-                return (
-                  <label key={p.id} className="check" style={{ display: 'flex', width: '100%', padding: '8px 10px', borderBottom: '1px solid var(--line)', gap: 10 }}>
-                    <input type="checkbox" checked={on} onChange={() => toggle(p.id)} />
-                    <span className="thumb">{p.images?.[0] ? <img src={assetUrl(p.images[0].url)} alt="" /> : null}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                      <span className="muted sm">{money(p.price)}{p.compare_at_price ? ` · compare ${money(p.compare_at_price)}` : ''}</span>
-                    </span>
-                    <span className="sm" style={{ textAlign: 'right', color: np ? 'var(--green, #16a34a)' : 'var(--muted)' }}>{np ? `→ ${money(np)}` : 'no discount'}</span>
-                  </label>
-                );
-              })}
-            </div>
-            {noDiscount > 0 && <div className="hint" style={{ color: '#b45309', marginTop: 6 }}>{noDiscount} selected product(s) would get no discount (the result is not cheaper than the selling price). Add a higher compare price or switch to “Selling price”.</div>}
-          </Field>
+          <ScopePicker value={edit} onChange={(v) => setEdit((s) => ({ ...s, ...v }))} />
         </Modal>
       )}
     </div>
