@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Icon from './Icon';
 import { api } from '@/lib/api';
+import { bump, useRevision } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { timeAgo } from '@/lib/format';
 
@@ -75,6 +76,10 @@ export default function Shell({ children }) {
     return () => clearInterval(t);
   }, [refresh, path]);
 
+  const rev = useRevision();
+  useEffect(() => { if (rev) refresh(true); }, [rev, refresh]);
+  const [spin, setSpin] = useState(false);
+  const refreshAll = () => { setSpin(true); bump(); setTimeout(() => setSpin(false), 700); };
   useEffect(() => { setOpen(false); setMsgOpen(false); }, [path]);
   // pages tell the top bar the moment something was read / handled, so the counters drop to 0 at once
   useEffect(() => {
@@ -145,6 +150,9 @@ export default function Shell({ children }) {
               </div>
             )}
           </div>
+          <button type="button" className="iconbtn" title="Refresh everything" aria-label="Refresh everything" onClick={refreshAll}>
+            <span style={{ display: 'inline-flex', transition: 'transform .7s', transform: spin ? 'rotate(360deg)' : 'none' }}><Icon name="refresh" /></span>
+          </button>
           <Link href="/notifications" className="iconbtn" title="Notifications" aria-label="Notifications">
             <Icon name="bell" />{counts.notif > 0 && <span className="dot">{counts.notif}</span>}
           </Link>

@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRevision } from './store';
 
 /**
  * Runs an async loader and tracks { data, loading, error }.
@@ -43,6 +44,9 @@ export function useAsync(fn, deps = [], opts = {}) {
   }, deps); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { run(); }, [run]);
+  const rev = useRevision();
+  const firstRev = useRef(rev);
+  useEffect(() => { if (rev !== firstRev.current) { firstRev.current = rev; if (every) quiet(); } }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!every) return undefined;
     const tick = () => { if (!document.hidden) quiet(); };

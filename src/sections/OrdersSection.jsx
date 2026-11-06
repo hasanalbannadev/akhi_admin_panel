@@ -69,6 +69,15 @@ export default function OrdersSection() {
       setSel([]); setBulk(''); list.reload();
     } catch (e) { toast.error(e.message); }
   }
+  async function deleteBulk() {
+    if (!sel.length) return;
+    if (!(await confirm({ title: 'Delete orders for good?', text: `${sel.length} order(s) will be removed from the database. This cannot be undone.`, confirmText: 'Delete', danger: true }))) return;
+    try {
+      const r = await api('/admin/orders/bulk-delete', { method: 'POST', body: { order_nos: sel } });
+      toast.ok(`${r.deleted.length} deleted`);
+      setSel([]); setBulk(''); list.reload();
+    } catch (e) { toast.error(e.message); }
+  }
   async function exportCsv() {
     try { await download('/admin/export/orders.csv', 'orders.csv', { days, status }); toast.ok('CSV downloaded'); setExp(false); }
     catch (e) { toast.error(e.message); }
@@ -146,6 +155,7 @@ export default function OrdersSection() {
               {ORDER_STATUSES.filter((s) => s !== 'pending').map((s) => <option key={s} value={s}>{label(s)}</option>)}
             </select>
             <button className="btn pri sm" disabled={!bulk} onClick={applyBulk}>Apply</button>
+            <button className="btn sm danger" onClick={deleteBulk}><Icon name="trash" size={14} /> Delete</button>
             <button className="btn sm" onClick={() => setSel([])}>Clear</button>
           </div>
         </div>
@@ -170,10 +180,15 @@ export default function OrdersSection() {
       {inv && <InvoiceModal orderNo={inv} onClose={() => setInv(null)} />}
 
       {bal && (
-        <Modal title="Steadfast balance" onClose={() => setBal(null)} footer={<button className="btn" onClick={() => setBal(null)}>Close</button>}>
+        <Modal title="Courier balance" onClose={() => setBal(null)} footer={<button className="btn" onClick={() => setBal(null)}>Close</button>}>
           {bal.current_balance !== undefined
-            ? <div><div className="muted sm">Courier currently owes you</div><b style={{ fontSize: 24 }}>{money(bal.current_balance)}</b></div>
+            ? <div><div className="muted sm">Steadfast currently owes you</div><b style={{ fontSize: 24 }}>{money(bal.current_balance)}</b></div>
             : <pre style={{ background: 'var(--gray-l)', padding: 12, borderRadius: 10, overflow: 'auto', fontSize: 12 }}>{JSON.stringify(bal, null, 2)}</pre>}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, #e5e7eb)' }}>
+            <div className="muted sm">Pathao</div>
+            <div className="sm">Pathao does not give the balance through its API. See it in the Pathao merchant panel.</div>
+            <a className="btn sm" style={{ marginTop: 8, display: 'inline-flex' }} href="https://merchant.pathao.com" target="_blank" rel="noreferrer">Open Pathao panel</a>
+          </div>
         </Modal>
       )}
 
@@ -218,6 +233,12 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
     if (!(await confirm({ title: 'Cancel this order?', text: 'The customer asked for it. Stock goes back to inventory.', confirmText: 'Cancel order', danger: true }))) return;
     setBusy(true);
     try { await api(`/admin/orders/${orderNo}/status`, { method: 'PATCH', body: { status: 'cancelled' } }); toast.ok('Order cancelled'); reload(); onChanged(); }
+    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  }
+  async function deleteOrder() {
+    if (!(await confirm({ title: 'Delete this order for good?', text: `${orderNo} will be removed from the database with its items, payments and return request. This cannot be undone.`, confirmText: 'Delete', danger: true }))) return;
+    setBusy(true);
+    try { await api(`/admin/orders/${orderNo}`, { method: 'DELETE' }); toast.ok('Order deleted'); onChanged(); onClose(); }
     catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
   async function keepOrder() {
@@ -289,6 +310,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
               {['steadfast', 'pathao'].includes(o.courier) && o.tracking_code && <button className="btn" onClick={steadfastStatus}><Icon name="refresh" size={15} /> Courier status</button>}
               {['steadfast', 'pathao'].includes(o.courier) && o.tracking_code && <button className="btn" onClick={trackingHistory}><Icon name="truck" size={15} /> Tracking history</button>}
               <button className="btn" onClick={customerCheck}><Icon name="eye" size={15} /> Check customer</button>
+              <button className="btn danger" disabled={busy} onClick={deleteOrder}><Icon name="trash" size={15} /> Delete</button>
             </div>
             {sf && (
               <div className="card" style={{ padding: 12, marginTop: 12 }}>

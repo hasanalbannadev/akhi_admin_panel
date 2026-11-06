@@ -1,3 +1,5 @@
+import { bump } from './store';
+
 /**
  * Tiny API client used by every section.
  * - Base path is /api/v1 (Next.js forwards it to the FastAPI backend, see next.config.js).
@@ -74,11 +76,12 @@ export async function api(path, { method = 'GET', body, query, form, auth = true
   } catch {
     throw new Error('Cannot reach the server. Check that the backend is running.');
   }
-  if (res.status === 204) return null;
+  if (res.status === 204) { if (method !== 'GET') setTimeout(bump, 150); return null; }
   let data = null;
   try { data = await res.json(); } catch { /* empty body */ }
   if (res.status === 401 && auth) { onUnauthorized(); throw new Error('Session expired. Please sign in again.'); }
   if (!res.ok) throw new Error(errorText(data, res.status));
+  if (method !== 'GET') setTimeout(bump, 150);   // something changed: every open screen reloads itself
   return data;
 }
 

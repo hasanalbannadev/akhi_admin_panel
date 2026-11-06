@@ -18,7 +18,7 @@ export default function InvoiceModal({ orderNo, onClose }) {
   const [inv, setInv] = useState(null);
   const [busy, setBusy] = useState(false);
   const [withCourier, setWithCourier] = useState(true);
-  const view = inv && !withCourier ? { ...inv, courier: null, tracking_code: null, consignment_id: null } : inv;
+  const view = inv && !withCourier ? { ...inv, courier: null, consignment_id: null } : inv;
 
   useEffect(() => {
     let live = true;
@@ -59,7 +59,7 @@ export default function InvoiceModal({ orderNo, onClose }) {
           <div className="sum-row"><span>Shipping</span><span>{money(inv.shipping_fee)}</span></div>
           <div className="sum-row tot"><span>Total</span><span>{money(inv.total)}</span></div>
           <div className="muted sm" style={{ marginTop: 10 }}>{methodName(inv.payment_method, inv.payment_label)} · {label(inv.payment_status)}</div>
-          {view.tracking_code && <div className="muted sm" style={{ marginTop: 4 }}>Courier: <b>{label(view.courier || '')}</b> · Tracking: <b>{view.tracking_code}</b>{view.consignment_id ? <> · Consignment: <b>{view.consignment_id}</b></> : null}</div>}
+          {view.tracking_code && <div className="muted sm" style={{ marginTop: 4 }}>{view.courier ? <>Courier: <b>{label(view.courier)}</b> · </> : null}Tracking: <b>{view.tracking_code}</b>{view.consignment_id ? <> · Consignment: <b>{view.consignment_id}</b></> : null}</div>}
         </div>
       )}
     </Modal>
