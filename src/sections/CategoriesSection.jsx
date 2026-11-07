@@ -83,7 +83,7 @@ export default function CategoriesSection() {
           <DataTable columns={columns} rows={rows} mobile={(c) => (
             <div className="flex sp center gap">
               <div className="cell-prod"><Thumb src={c.image_url} icon="tag" /><div className="t"><b>{c.name}</b><small>{c.parent_id ? `in ${nameOf[c.parent_id] || ''}` : 'Top level'} · <Badge tone={c.is_active ? 'green' : 'gray'}>{c.is_active ? 'Active' : 'Hidden'}</Badge></small></div></div>
-              <div className="flex gap"><button className="btn sm" onClick={() => open(c)}>Edit</button><button className="btn sm danger" onClick={() => remove(c)}><Icon name="trash" size={14} /></button></div>
+              <div className="flex gap"><button className="btn sm" onClick={() => open(c)}>Edit</button><button className="btn sm danger" onClick={() => remove(c)} aria-label="Delete"><Icon name="trash" size={14} /></button></div>
             </div>
           )} />
         )}

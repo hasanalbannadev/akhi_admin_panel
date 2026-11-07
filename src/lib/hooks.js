@@ -46,7 +46,7 @@ export function useAsync(fn, deps = [], opts = {}) {
   useEffect(() => { run(); }, [run]);
   const rev = useRevision();
   const firstRev = useRef(rev);
-  useEffect(() => { if (rev !== firstRev.current) { firstRev.current = rev; if (every) quiet(); } }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (rev !== firstRev.current) { firstRev.current = rev; quiet(); } }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!every) return undefined;
     const tick = () => { if (!document.hidden) quiet(); };
@@ -54,7 +54,11 @@ export function useAsync(fn, deps = [], opts = {}) {
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick); };
   }, [quiet, every]);
-  return { ...state, reload: run };
+  // একবার ডাটা এসে গেলে reload() চুপচাপ শুধু বদলানো অংশ আপডেট করে (স্পিনার/ঝিলিক নেই)
+  const hasData = useRef(false);
+  hasData.current = state.data != null;
+  const reload = useCallback(() => (hasData.current ? quiet() : run()), [quiet, run]);
+  return { ...state, reload };
 }
 
 function safeJson(v) { try { return JSON.stringify(v); } catch { return String(Math.random()); } }

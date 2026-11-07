@@ -60,7 +60,7 @@ export default function BannersSection() {
                   <div className="flex center gap"><Switch checked={b.is_active} onChange={(v) => toggle(b, v)} /><span className="muted sm">{b.is_active ? 'Shown' : 'Hidden'}</span></div>
                   <div className="flex gap">
                     <button className="btn sm" onClick={() => setEdit({ ...b, title: b.title || '', link_url: b.link_url || '', image_url: b.image_url || '', subtitle: b.subtitle || '', button_text: b.button_text || '', placement: b.placement || 'hero' })}><Icon name="edit" size={14} /></button>
-                    <button className="btn sm danger" onClick={() => remove(b)}><Icon name="trash" size={14} /></button>
+                    <button className="btn sm danger" onClick={() => remove(b)} aria-label="Delete"><Icon name="trash" size={14} /></button>
                   </div>
                 </div>
               </div>

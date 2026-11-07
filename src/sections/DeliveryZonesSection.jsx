@@ -48,7 +48,7 @@ export default function DeliveryZonesSection() {
     { h: 'Districts', cell: (z) => <Dists z={z} /> },
     { h: 'Fee', cell: (z) => <b>{money(z.fee)}</b> },
     { h: 'Free over', cell: (z) => (z.free_over ? money(z.free_over) : <span className="muted">—</span>) },
-    { h: '', cls: 'r', cell: (z) => <div className="acts"><button className="btn sm" onClick={() => open(z)}><Icon name="edit" size={14} /> Edit</button><button className="btn sm danger" onClick={() => remove(z)}><Icon name="trash" size={14} /></button></div> },
+    { h: '', cls: 'r', cell: (z) => <div className="acts"><button className="btn sm" onClick={() => open(z)}><Icon name="edit" size={14} /> Edit</button><button className="btn sm danger" onClick={() => remove(z)} aria-label="Delete"><Icon name="trash" size={14} /></button></div> },
   ];
 
   return (
@@ -59,7 +59,7 @@ export default function DeliveryZonesSection() {
         {loading && !data ? <Loading /> : rows.length === 0 ? <Empty icon="truck" text="No delivery zones yet" /> : (
           <DataTable columns={columns} rows={rows} mobile={(z) => (
             <div><div className="flex sp"><b>{z.name}</b><b>{money(z.fee)}</b></div><div style={{ margin: '8px 0' }}><Dists z={z} /></div>
-              <div className="flex gap"><button className="btn sm" onClick={() => open(z)}>Edit</button><button className="btn sm danger" onClick={() => remove(z)}><Icon name="trash" size={14} /></button></div></div>
+              <div className="flex gap"><button className="btn sm" onClick={() => open(z)}>Edit</button><button className="btn sm danger" onClick={() => remove(z)} aria-label="Delete"><Icon name="trash" size={14} /></button></div></div>
           )} />
         )}
       </div></div>

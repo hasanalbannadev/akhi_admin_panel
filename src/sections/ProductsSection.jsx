@@ -127,7 +127,7 @@ function ProductList({ onAdd, onEdit }) {
                   <div className="flex center gap"><Switch checked={p.is_active} onChange={(v) => toggle(p, v)} /><span className="muted sm">{p.is_active ? 'Active' : 'Hidden'}</span></div>
                   <div className="flex gap">
                     <button className="btn sm" onClick={() => onEdit(p.id)}>Edit</button>
-                    <button className="btn sm danger" onClick={() => remove(p)}><Icon name="trash" size={14} /></button>
+                    <button className="btn sm danger" onClick={() => remove(p)} aria-label="Delete"><Icon name="trash" size={14} /></button>
                   </div>
                 </div>
               </div>
