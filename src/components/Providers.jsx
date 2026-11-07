@@ -1,5 +1,7 @@
 'use client';
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { startRealtime } from '@/lib/realtime';
+import { useBusy } from '@/lib/store';
 import Icon from './Icon';
 import { Modal } from './ui';
 
@@ -9,10 +11,21 @@ const ConfirmCtx = createContext(null);
 export function useToast() { return useContext(ToastCtx); }
 export function useConfirm() { return useContext(ConfirmCtx); }
 
+function TopBar() {
+  const on = useBusy();
+  if (!on) return null;
+  return (
+    <div aria-hidden style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 3, zIndex: 9999, overflow: 'hidden', background: 'var(--pink-l)', pointerEvents: 'none' }}>
+      <div style={{ height: '100%', width: '33%', background: 'var(--pink)', animation: 'topbar 0.9s ease-in-out infinite' }} />
+    </div>
+  );
+}
+
 export default function Providers({ children }) {
   const [toasts, setToasts] = useState([]);
   const idRef = useRef(1);
   const [dlg, setDlg] = useState(null);
+  useEffect(() => startRealtime(), []);
 
   const push = useCallback((kind, text) => {
     const id = idRef.current++;
@@ -31,6 +44,7 @@ export default function Providers({ children }) {
   return (
     <ToastCtx.Provider value={toast}>
       <ConfirmCtx.Provider value={confirm}>
+        <TopBar />
         {children}
         <div className="toasts">
           {toasts.map((t) => (

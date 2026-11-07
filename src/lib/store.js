@@ -21,3 +21,11 @@ export function subscribe(f) {
 export function useRevision() {
   return useSyncExternalStore(subscribe, () => revision, () => 0);
 }
+
+// Slim loading bar at the top while a save/button action is running.
+let pending = 0;
+const bsubs = new Set();
+export function busy(delta) { pending = Math.max(0, pending + delta); bsubs.forEach((f) => f()); }
+export function useBusy() {
+  return useSyncExternalStore((f) => { bsubs.add(f); return () => bsubs.delete(f); }, () => pending > 0, () => false);
+}

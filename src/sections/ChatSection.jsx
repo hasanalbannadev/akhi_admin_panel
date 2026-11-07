@@ -26,6 +26,11 @@ export default function ChatSection() {
   const msgs = useAsync(() => (sel ? api(`/admin/chat/threads/${sel.id}/messages`) : Promise.resolve([])), [sel?.id], { every: 1000 });
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.data]);
+  useEffect(() => {
+    const rt = (e) => { if (e.detail && e.detail.t === 'chat') { threads.reload(); msgs.reload(); } };
+    window.addEventListener('rt-push', rt);
+    return () => window.removeEventListener('rt-push', rt);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function send(e) {
     e.preventDefault();

@@ -334,3 +334,5 @@ table.tbl { width: 100%; border-collapse: collapse; min-width: 640px; }
 .trackwrap { margin: 0 0 16px; max-width: 100%; }
 .trackwrap .cs { text-align: center; }
 .card, .grid > * { min-width: 0; }
+
+@keyframes topbar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }

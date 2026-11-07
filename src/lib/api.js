@@ -1,4 +1,4 @@
-import { bump } from './store';
+import { bump, busy } from './store';
 
 /**
  * Tiny API client used by every section.
@@ -71,9 +71,13 @@ export async function api(path, { method = 'GET', body, query, form, auth = true
   else if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
 
   let res;
+  const track = method !== 'GET' && typeof window !== 'undefined';
+  if (track) busy(1);
   try {
     res = await fetch(buildUrl(path, query), { method, headers, body: payload });
+    if (track) setTimeout(() => busy(-1), 700);
   } catch {
+    if (track) busy(-1);
     throw new Error('Cannot reach the server. Check that the backend is running.');
   }
   if (res.status === 204) { if (method !== 'GET') setTimeout(bump, 150); return null; }
@@ -112,9 +116,22 @@ export async function discardImage(url) {
 }
 
 /** Uploads one image file and returns its public URL. (POST /admin/upload) */
+async function shrink(file, maxSide = 1600, quality = 0.85) {
+  try {
+    if (typeof document === 'undefined' || !/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 400 * 1024) return file;
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', quality));
+    return blob && blob.size < file.size ? new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
+  } catch { return file; }
+}
+
 export async function uploadImage(file) {
   const fd = new FormData();
-  fd.append('file', file);
+  fd.append('file', await shrink(file));
   const r = await api('/admin/upload', { method: 'POST', form: fd });
   return r.url;
 }

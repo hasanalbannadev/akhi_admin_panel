@@ -92,7 +92,8 @@ function Overview({ goLogs }) {
           <div className="flex gap"><input className="input" placeholder="01XXXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <button className="btn pri" disabled={busy} onClick={test}>{busy ? 'Sending…' : 'Send test'}</button></div>
           {res && <div style={{ marginTop: 10, padding: 10, borderRadius: 10, fontSize: 13, wordBreak: 'break-word', background: res.ok ? '#f0fdf4' : '#fef2f2', color: res.ok ? '#166534' : '#7f1d1d' }}>
-            {res.ok ? 'Delivered to the provider ✔ — check the phone.' : <>Failed: {res.reason}</>}</div>}
+            {res.ok ? 'Delivered to the provider ✔ — check the phone.' : <>Failed: {res.reason}</>}
+            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>Server IP to whitelist: <b>{res.server_ip}</b> · provider: {res.provider} · key {res.api_key_set ? 'set' : 'MISSING'} · sender id {res.sender_id_set ? 'set' : 'MISSING'}</div></div>}
         </div></div>
       </div>
     </div>

@@ -31,20 +31,25 @@ export default function SupportSection() {
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.length, sel?.user_id]);
   // every 3 s: only NEW messages of the open chat + the customer list; the full chat every ~20 s (catches deletes)
   const tick = useRef(0);
+  const pull = async (full) => {
+    threads.reload();
+    if (!sel) return;
+    if (full) { conv.reload(); return; }
+    const last = live.length ? live[live.length - 1].id : 0;
+    try {
+      const r = await api(`/admin/support/threads/${sel.user_id}`, { query: last ? { after: last } : undefined });
+      if (r.messages?.length) setLive((m) => { const have = new Set(m.map((x) => x.id)); return [...m, ...r.messages.filter((x) => !have.has(x.id))]; });
+    } catch { /* next tick */ }
+  };
   useEffect(() => {
-    const t = setInterval(async () => {
+    const t = setInterval(() => {
       if (document.hidden) return;
       tick.current += 1;
-      threads.reload();
-      if (!sel) return;
-      if (tick.current % 20 === 0) { conv.reload(); return; }
-      const last = live.length ? live[live.length - 1].id : 0;
-      try {
-        const r = await api(`/admin/support/threads/${sel.user_id}`, { query: last ? { after: last } : undefined });
-        if (r.messages?.length) setLive((m) => { const have = new Set(m.map((x) => x.id)); return [...m, ...r.messages.filter((x) => !have.has(x.id))]; });
-      } catch { /* next tick */ }
+      pull(tick.current % 20 === 0);
     }, 1000);
-    return () => clearInterval(t);
+    const rt = (e) => { const k = e.detail && e.detail.t; if (k === 'support') pull(false); };
+    window.addEventListener('rt-push', rt);
+    return () => { clearInterval(t); window.removeEventListener('rt-push', rt); };
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // /support?u=<user id> (from the top bar message list) opens that customer's chat
