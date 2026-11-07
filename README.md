@@ -1,62 +1,55 @@
-# Akhi Lifestyle — Admin Panel (Next.js 14)
+# Akhi Lifestyle - Customer Website (Next.js)
 
-Full admin panel for your FastAPI shop backend. Uses all admin endpoints (73). Responsive: desktop, tablet, phone.
+আপনার লাইভ `shop_backend` (FastAPI) API এর উপর বানানো কাস্টমার ওয়েবসাইট। Admin panel নেই, শুধু কাস্টমার সাইড।
+Stack: Next.js (App Router) + TypeScript + Tailwind CSS v4।
 
-## Run in VS Code
-
+## ১. VS Code এ চালানো
 ```bash
-# 1. open this folder in VS Code, open the terminal
 npm install
-
-# 2. tell it where your backend runs
-cp .env.local.example .env.local      # Windows: copy .env.local.example .env.local
-# edit BACKEND_URL (already set to http://150.136.74.154:8001 in .env.local)
-
-# 3. start
-npm run dev
+cp .env.example .env.local      # তারপর .env.local এ নিজের মান বসান
+npm run dev                     # http://localhost:3000
 ```
-Open http://localhost:3000 and sign in with your owner username/password
-(the `ADMIN_USERNAME` / `ADMIN_PASSWORD` from the backend `.env`, or a staff account).
+Node 20.9+ লাগবে।
 
-Backend must be running first. No CORS setup needed: Next.js forwards `/api/*` and `/uploads/*` to `BACKEND_URL`.
-
-Production: `npm run build` then `npm start`.
-On your server set `BACKEND_URL=http://127.0.0.1:8001` (the port your FastAPI runs on) before building.
-
-## Project layout — one file per section
-
-All the code for a section (list, forms, every API call) is in ONE file:
-
-| Section | File |
+## ২. .env.local (সবচেয়ে জরুরি)
+| নাম | কাজ |
 |---|---|
-| Dashboard | `src/sections/DashboardSection.jsx` |
-| Products (+ add/edit, images, stock) | `src/sections/ProductsSection.jsx` |
-| Categories | `src/sections/CategoriesSection.jsx` |
-| Orders (+ detail, invoice, Steadfast, CSV export) | `src/sections/OrdersSection.jsx` |
-| Payments (bKash/Nagad verify) | `src/sections/PaymentsSection.jsx` |
-| Customers | `src/sections/CustomersSection.jsx` |
-| Coupons | `src/sections/CouponsSection.jsx` |
-| Banners | `src/sections/BannersSection.jsx` |
-| Reviews | `src/sections/ReviewsSection.jsx` |
-| Returns | `src/sections/ReturnsSection.jsx` |
-| Inventory | `src/sections/InventorySection.jsx` |
-| Delivery zones | `src/sections/DeliveryZonesSection.jsx` |
-| Chat & Messages | `src/sections/ChatSection.jsx` |
-| Notifications | `src/sections/NotificationsSection.jsx` |
-| Reports | `src/sections/ReportsSection.jsx` |
-| Staff (owner) | `src/sections/StaffSection.jsx` |
-| Settings + my password | `src/sections/SettingsSection.jsx` |
+| `NEXT_PUBLIC_API_URL` | লাইভ Backend, শেষে `/api/v1` (যেমন `https://api.yourdomain.com/api/v1`) |
+| `NEXT_PUBLIC_SITE_URL` | এই সাইটের লাইভ ঠিকানা (SEO/sitemap) |
+| বাকিগুলো | দোকানের নাম, ফোন, ইমেইল, ঠিকানা, সোশ্যাল, Messenger/WhatsApp |
 
-To change a section, edit only its file. The top comment of each file lists the endpoints it uses.
-`src/app/(admin)/<name>/page.jsx` are tiny wrappers (just render the section).
+## ৩. Backend এ যা বদলাতে হবে (খুব জরুরি)
+Backend এর `.env` এ:
+- `FRONTEND_URL=https://yourdomain.com` (CORS + SSLCommerz পেমেন্টের পর এখানেই ফেরত আসে)
+- লোকাল টেস্টে `http://localhost:3000` আগে থেকেই allowed আছে।
+- SSLCommerz success/fail redirect যায় `/order/{অর্ডার নম্বর}?paid=1` বা `?paid=0` এ (এই পেজ বানানো আছে)।
 
-Shared: `src/lib/api.js` (API client), `src/components/ui.jsx` (modal, table, uploader…), `src/components/Shell.jsx` (sidebar + top bar), `src/app/globals.css` (colours: change `--pink` / `--navy` at the top).
+## ৪. হোস্ট
+- **Vercel**: GitHub এ push -> Import -> Environment Variables এ `.env.example` এর মান বসান -> Deploy।
+- **VPS**: `npm run build && npm start` (PM2 + Nginx proxy)।
 
-## Roles
-- **owner**: everything.
-- **staff**: everything except Settings (view only), Staff page, sales/profit/top-customer reports (the backend blocks these).
+## ৫. ফোল্ডার ম্যাপ (কোথায় কী এডিট করবেন)
+```
+src/app/            পেজ (page.tsx), layout, robots, sitemap, manifest
+src/components/     ui/ layout/ home/ product/ cart/ checkout/ orders/ account/
+src/context/        Auth, Cart, Wishlist, Toast
+src/lib/api/        Backend এর প্রতিটা endpoint (catalog, cart, orders, payments, ...)
+src/lib/constants.ts  সব বাংলা লেবেল, মেনু, ফিল্টার রেঞ্জ
+src/lib/site.ts     দোকানের তথ্য
+src/app/globals.css রং/ফন্ট (brand-600 = মূল গোলাপি)
+```
+- হোম সেকশন বদলাতে: `src/app/page.tsx`
+- Footer লিংক: `src/lib/constants.ts`
+- প্রোমো ব্যানারের লেখা: `src/components/home/PromoBanner.tsx`
 
-## Notes
-- Token is stored in the browser (localStorage), valid 12 hours, then you sign in again.
-- Chat reply needs `META_PAGE_TOKEN` in the backend `.env`, otherwise it shows a 503 message.
-- "Send to Steadfast" needs the Steadfast keys in the backend `.env`.
+## ৬. যা আছে
+হোম (Banner slider, Best seller, New) · ক্যাটাগরি/শপ (ফিল্টার, সর্ট, পেজিনেশন) · প্রোডাক্ট ডিটেইলস (গ্যালারি, রিভিউ, ডেলিভারি, রিলেটেড) · কার্ট (guest ও চলে) · চেকআউট (ঠিকানা, কুপন, COD/SSLCommerz/bKash/Nagad) · অর্ডার ডিটেইলস (ট্র্যাকিং, ইনভয়েস, ক্যান্সেল, রিটার্ন, রি-অর্ডার) · গেস্ট অর্ডার ট্র্যাক · OTP লগইন · প্রোফাইল, ঠিকানা, পছন্দের তালিকা, রিভিউ, রিটার্ন, পেমেন্ট হিস্টরি, নোটিফিকেশন · সার্চ সাজেশন · মোবাইল bottom nav।
+
+## ৭. সীমাবদ্ধতা (Backend এ endpoint নেই বলে)
+- **লাইভ চ্যাট**: কাস্টমারের জন্য chat API নেই (Messenger webhook), তাই সাপোর্ট পেজে Messenger/WhatsApp/ফোন লিংক আছে।
+- **নোটিফিকেশন**: আলাদা API নেই, অর্ডার ও রিটার্নের অবস্থা থেকে তৈরি হয়।
+- **কালার/সাইজ ভ্যারিয়েন্ট, ব্র্যান্ড ফিল্টার, প্রোডাক্ট রেটিং কার্ডে**: Backend এ নেই, তাই বাদ।
+- প্রোডাক্টে রিভিউ দেওয়া যায় শুধু ডেলিভারি পাওয়া কাস্টমার (Backend নিয়ম)।
+
+## ৮. SEO
+প্রতি পেজে title/description/canonical/Open Graph, পণ্যে Product + Breadcrumb JSON-LD, `sitemap.xml` (পণ্য ও ক্যাটাগরি অটো), `robots.txt`, প্রাইভেট পেজ noindex।

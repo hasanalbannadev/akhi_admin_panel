@@ -2,5 +2,7 @@ node_modules
 .next
 out
 .env
-*.log
+.env.local
+*.tsbuildinfo
+next-env.d.ts
 .DS_Store
