@@ -13,6 +13,17 @@ import { api, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { dt, getParam, timeAgo } from '@/lib/format';
 
+// Customer avatar: profile photo when the customer has one, otherwise the first letter (same circle as before).
+function Av({ u, name }) {
+  const [bad, setBad] = useState(false);
+  const src = u && u.avatar_url && !bad ? assetUrl(u.avatar_url) : null;
+  return (
+    <div className="avatar" style={src ? { overflow: 'hidden', padding: 0 } : undefined}>
+      {src ? <img src={src} alt="" onError={() => setBad(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : name.slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
 export default function SupportSection() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -38,7 +49,7 @@ export default function SupportSection() {
     const last = live.length ? live[live.length - 1].id : 0;
     try {
       const r = await api(`/admin/support/threads/${sel.user_id}`, { query: last ? { after: last } : undefined });
-      if (r.messages?.length) setLive((m) => { const have = new Set(m.map((x) => x.id)); return [...m, ...r.messages.filter((x) => !have.has(x.id))]; });
+      if (r.messages?.length) { setLive((m) => { const have = new Set(m.map((x) => x.id)); return [...m, ...r.messages.filter((x) => !have.has(x.id))]; }); window.dispatchEvent(new CustomEvent('badges-refresh')); }
     } catch { /* next tick */ }
   };
   useEffect(() => {
@@ -91,7 +102,7 @@ export default function SupportSection() {
         <div className="threads">
           {threads.loading && !threads.data ? <Loading /> : list.length === 0 ? <Empty icon="chat" text="No customer messages yet" /> : list.map((t) => (
             <div key={t.user_id} className={`th ${sel?.user_id === t.user_id ? 'on' : ''}`} onClick={() => setSel(t)}>
-              <div className="avatar">{who(t).slice(0, 1).toUpperCase()}</div>
+              <Av u={t} name={who(t)} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div className="flex sp"><b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who(t)}</b><span className="muted sm">{timeAgo(t.last_at)}</span></div>
                 <div className="flex sp center gap">
@@ -107,16 +118,19 @@ export default function SupportSection() {
             <>
               <div className="flex center gap" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
                 <button className="btn sm back" onClick={() => setSel(null)}><Icon name="back" size={14} /></button>
-                <div className="avatar">{who(sel).slice(0, 1).toUpperCase()}</div>
+                <Av u={sel} name={who(sel)} />
                 <div style={{ flex: 1, minWidth: 0 }}><b>{who(sel)}</b><div className="muted sm">{sel.phone}</div></div>
                 <button className="btn sm danger" onClick={delThread} aria-label="Delete conversation"><Icon name="trash" size={14} /></button>
               </div>
               <div className="msgs">
                 {conv.loading && !conv.data ? <Loading /> : msgs.map((m) => (
-                  <div key={m.id} className={`bubble ${m.sender === 'admin' ? 'out' : ''}`}>
+                  <div key={m.id} style={m.sender === 'admin' ? { display: 'contents' } : { display: 'flex', alignItems: 'flex-end', gap: 8, maxWidth: '82%' }}>
+                  {m.sender !== 'admin' && <Av u={conv.data?.user || sel} name={who(sel)} />}
+                  <div className={`bubble ${m.sender === 'admin' ? 'out' : ''}`} style={m.sender === 'admin' ? undefined : { maxWidth: 'none' }}>
                     {m.text}
                     {m.images?.length > 0 && <div className="flex gap" style={{ flexWrap: 'wrap', marginTop: 6 }}>{m.images.map((u) => <a key={u} href={assetUrl(u)} target="_blank" rel="noopener noreferrer"><img src={assetUrl(u)} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8 }} /></a>)}</div>}
                     <small>{dt(m.created_at)}{m.edited ? ' · edited' : ''} · <a role="button" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => delMsg(m)}>delete</a></small>
+                  </div>
                   </div>
                 ))}
                 <div ref={endRef} />

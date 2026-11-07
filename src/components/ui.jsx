@@ -189,6 +189,7 @@ export function DataTable({ columns, rows, rowKey = 'id', mobile, onRowClick, co
 export function ChatComposer({ text, onText, images, onImages, onSend, sending, max = 3, placeholder = 'Write a reply…' }) {
   const toast = useToast();
   const ref = useRef(null);
+  const cam = useRef(null);
   const [up, setUp] = useState(false);
   const can = (text.trim() || images.length) && !sending && !up;
 
@@ -218,11 +219,15 @@ export function ChatComposer({ text, onText, images, onImages, onSend, sending, 
         <button type="button" className="round" title="Add photo" aria-label="Add photo" disabled={images.length >= max || up} onClick={() => ref.current?.click()}>
           {up ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="plus" size={18} />}
         </button>
+        <button type="button" className="round" title="Take photo" aria-label="Take photo" disabled={images.length >= max || up} onClick={() => cam.current?.click()}>
+          <Icon name="camera" size={18} />
+        </button>
         <textarea className="input" rows={1} value={text} onChange={(e) => onText(e.target.value)} maxLength={1500} placeholder={placeholder}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700) { e.preventDefault(); if (can) onSend(); } }} />
         <button type="submit" className="round pri" aria-label="Send" disabled={!can}>{sending ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="send" size={17} />}</button>
       </div>
       <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={pick} />
+      <input ref={cam} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onChange={pick} />
     </form>
   );
 }
