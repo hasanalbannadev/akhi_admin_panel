@@ -190,6 +190,7 @@ export function ChatComposer({ text, onText, images, onImages, onSend, sending, 
   const toast = useToast();
   const ref = useRef(null);
   const cam = useRef(null);
+  const [menu, setMenu] = useState(false);
   const [up, setUp] = useState(false);
   const can = (text.trim() || images.length) && !sending && !up;
 
@@ -216,18 +217,26 @@ export function ChatComposer({ text, onText, images, onImages, onSend, sending, 
         </div>
       )}
       <div className="row">
-        <button type="button" className="round" title="Add photo" aria-label="Add photo" disabled={images.length >= max || up} onClick={() => ref.current?.click()}>
-          {up ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="plus" size={18} />}
-        </button>
-        <button type="button" className="round" title="Take photo" aria-label="Take photo" disabled={images.length >= max || up} onClick={() => cam.current?.click()}>
-          <Icon name="camera" size={18} />
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button type="button" className="round" title="Add photo" aria-label="Add photo" disabled={images.length >= max || up} onClick={() => setMenu((v) => !v)}>
+            {up ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="plus" size={18} />}
+          </button>
+          {menu && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setMenu(false)} />
+              <div style={{ position: 'absolute', bottom: 46, left: 0, zIndex: 20, width: 160, background: '#fff', border: '1px solid var(--line)', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                <button type="button" className="btn" style={{ width: '100%', justifyContent: 'flex-start', border: 0, borderRadius: 0 }} onClick={() => { setMenu(false); cam.current?.click(); }}><Icon name="camera" size={15} /> Camera</button>
+                <button type="button" className="btn" style={{ width: '100%', justifyContent: 'flex-start', border: 0, borderRadius: 0 }} onClick={() => { setMenu(false); ref.current?.click(); }}><Icon name="image" size={15} /> Gallery</button>
+              </div>
+            </>
+          )}
+        </div>
         <textarea className="input" rows={1} value={text} onChange={(e) => onText(e.target.value)} maxLength={1500} placeholder={placeholder}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700) { e.preventDefault(); if (can) onSend(); } }} />
         <button type="submit" className="round pri" aria-label="Send" disabled={!can}>{sending ? <span className="spin" style={{ width: 16, height: 16 }} /> : <Icon name="send" size={17} />}</button>
       </div>
-      <input ref={ref} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={pick} />
-      <input ref={cam} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden onChange={pick} />
+      <input ref={ref} type="file" accept="image/*" multiple hidden onChange={pick} />
+      <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
     </form>
   );
 }
