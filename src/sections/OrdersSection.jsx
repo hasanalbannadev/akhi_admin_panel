@@ -5,6 +5,7 @@
  *   GET   /admin/orders?status=&payment_status=&page=&page_size=
  *   GET   /admin/orders/{no}                      detail
  *   PATCH /admin/orders/{no}/status               {status, courier, tracking_code}
+ *   POST  /admin/orders                           manual order {phone, name, district, address, items, payment}
  *   POST  /admin/orders/bulk-status               {order_nos, status}
  *   GET   /admin/orders/{no}/invoice              printable invoice
  *   POST  /admin/orders/{no}/courier/send         {courier: steadfast|pathao, city_id?, zone_id?, area_id?}
@@ -20,6 +21,7 @@ import { useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
 import FlowTracker from '@/components/FlowTracker';
 import InvoiceModal from '@/components/InvoiceModal';
+import ManualOrderModal from '@/components/ManualOrderModal';
 import { Badge, DataTable, Empty, ErrorBox, Field, Loading, Modal, Pager, SearchBox } from '@/components/ui';
 import { useConfirm, useToast } from '@/components/Providers';
 import { api, download } from '@/lib/api';
@@ -47,6 +49,7 @@ export default function OrdersSection() {
   const [open, setOpen] = useState(null);      // order_no
   const [bulk, setBulk] = useState('');
   const [exp, setExp] = useState(false);
+  const [newOrder, setNewOrder] = useState(false);
   const [days, setDays] = useState(30);
   const [cBusy, setCBusy] = useState(false);
   const [bal, setBal] = useState(null);
@@ -144,6 +147,7 @@ export default function OrdersSection() {
         </div>
         <button className="btn" disabled={cBusy} onClick={showBalance}><Icon name="truck" size={15} /> Courier balance</button>
         <button className="btn" onClick={() => setExp(true)}><Icon name="download" size={15} /> Export CSV</button>
+        <button className="btn pri" onClick={() => setNewOrder(true)}><Icon name="plus" size={15} /> New order</button>
       </div>
 
       {sel.length > 0 && (
@@ -192,6 +196,7 @@ export default function OrdersSection() {
         </Modal>
       )}
 
+      {newOrder && <ManualOrderModal onClose={() => setNewOrder(false)} onCreated={(o) => { setNewOrder(false); list.reload(); setOpen(o.order_no); }} />}
       {open && <OrderDetail orderNo={open} onClose={() => setOpen(null)} onChanged={list.reload} />}
 
       {exp && (
