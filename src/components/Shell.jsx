@@ -20,6 +20,7 @@ const NAV = [
   { href: '/tracking', label: 'Order Tracking', icon: 'truck' },
   { href: '/payments', label: 'Payments', icon: 'card', badge: 'payments' },
   { href: '/payment-methods', label: 'Payment Accounts', icon: 'wallet' },
+  { href: '/company-accounts', label: 'Company Accounts', icon: 'chart', owner: true },
   { href: '/returns', label: 'Returns', icon: 'undo' },
   { href: '/customers', label: 'Customers', icon: 'users' },
   { sep: 'Marketing' },
