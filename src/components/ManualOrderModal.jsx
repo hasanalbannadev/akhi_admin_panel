@@ -16,7 +16,7 @@ import { money } from '@/lib/format';
 export default function ManualOrderModal({ onClose, onCreated }) {
   const toast = useToast();
   const [f, setF] = useState({ phone: '', name: '', district: '', area: '', address: '', payment: 'cod', paid_note: '',
-    shipping_fee: '', discount: '', note: '', status: 'confirmed', send_sms: true });
+    shipping_fee: '', discount: '', note: '', status: 'confirmed', send_sms: true, invoice_no: '' });
   const [lines, setLines] = useState([]);         // { product, color_id, quantity }
   const [q, setQ] = useState('');
   const dq = useDebounce(q, 300);
@@ -60,7 +60,7 @@ export default function ManualOrderModal({ onClose, onCreated }) {
         items: lines.map((l) => ({ product_id: l.product.id, color_id: l.color_id || null, quantity: l.quantity })),
         payment: f.payment, paid_note: f.paid_note.trim() || null,
         shipping_fee: f.shipping_fee === '' ? null : Number(f.shipping_fee), discount: Number(f.discount) || 0,
-        note: f.note.trim() || null, status: f.status, send_sms: f.send_sms } });
+        note: f.note.trim() || null, status: f.status, send_sms: f.send_sms, invoice_no: f.invoice_no.trim() || null } });
       toast.ok(`Order ${o.order_no} created`);
       onCreated(o);
     } catch (e) { toast.error(e.message); }
@@ -128,7 +128,10 @@ export default function ManualOrderModal({ onClose, onCreated }) {
           </select>
         </Field>
       </div>
-      <Field label="Note (optional)"><input className="input" value={f.note} onChange={set('note')} /></Field>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <Field label="Invoice no. (optional)" hint="Shown to the customer. Empty = the website's own number."><input className="input" maxLength={40} value={f.invoice_no} onChange={set('invoice_no')} /></Field>
+        <Field label="Note (optional)"><input className="input" value={f.note} onChange={set('note')} /></Field>
+      </div>
       {f.status === 'confirmed' && <label className="check"><input type="checkbox" checked={f.send_sms} onChange={set('send_sms')} /> Send the “order confirmed” SMS to the customer</label>}
     </Modal>
   );

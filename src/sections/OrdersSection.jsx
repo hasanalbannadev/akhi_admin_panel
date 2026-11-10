@@ -107,7 +107,7 @@ export default function OrdersSection() {
 
   const columns = [
     { h: <input type="checkbox" checked={allOn} onChange={() => setSel(allOn ? [] : rows.map((o) => o.order_no))} aria-label="Select all" />, noClick: true, cell: (o) => <input type="checkbox" checked={sel.includes(o.order_no)} onChange={() => toggle(o.order_no)} /> },
-    { h: 'Order', cell: (o) => <div><b>{o.order_no}</b><div className="muted sm">{dt(o.created_at)}</div>{o.cancel_requested && o.status !== 'cancelled' && <Badge tone="red">Cancel requested</Badge>}</div> },
+    { h: 'Order', cell: (o) => <div><b>{o.order_no}</b>{o.invoice_no && <div className="muted sm">Invoice {o.invoice_no}</div>}<div className="muted sm">{dt(o.created_at)}</div>{o.cancel_requested && o.status !== 'cancelled' && <Badge tone="red">Cancel requested</Badge>}</div> },
     { h: 'Customer', cell: (o) => <div><b>{o.ship_name}</b><div className="muted sm">{o.ship_phone} · {o.ship_district}</div></div> },
     { h: 'Items', cell: (o) => o.items.reduce((a, i) => a + i.quantity, 0) },
     { h: 'Total', cell: (o) => <b>{money(o.total)}</b> },
@@ -171,7 +171,7 @@ export default function OrdersSection() {
           <>
             <DataTable columns={columns} rows={rows} rowKey="order_no" mobile={(o) => (
               <div onClick={() => setOpen(o.order_no)}>
-                <div className="flex sp center"><b>{o.order_no}</b><b>{money(o.total)}</b></div>
+                <div className="flex sp center"><b>{o.order_no}{o.invoice_no ? ` · ${o.invoice_no}` : ''}</b><b>{money(o.total)}</b></div>
                 <div className="muted sm">{o.ship_name} · {o.ship_phone}</div>
                 <div className="flex gap wrap" style={{ marginTop: 8 }}><Pill o={o} /><Pay o={o} /><span className="muted sm">{dt(o.created_at)}</span><button className="btn sm" onClick={(e) => { e.stopPropagation(); setInv(o.order_no); }}>Invoice</button></div>
               </div>
@@ -218,19 +218,20 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
   const { data: o, loading, error, reload } = useAsync(() => api(`/admin/orders/${orderNo}`), [orderNo]);
   const [status, setStatus] = useState('');
   const [courier, setCourier] = useState('');
+  const [inv, setInv] = useState('');
   const [track, setTrack] = useState('');
   const [busy, setBusy] = useState(false);
   const [sf, setSf] = useState(null);
   const [extra, setExtra] = useState(null);   // {title, data} for tracking history / customer check
   const [invoice, setInvoice] = useState(false);
 
-  useEffect(() => { if (o) { setStatus(o.status); setCourier(o.courier || ''); setTrack(o.tracking_code || ''); } }, [o]);
+  useEffect(() => { if (o) { setStatus(o.status); setCourier(o.courier || ''); setTrack(o.tracking_code || ''); setInv(o.invoice_no || ''); } }, [o]);
 
   async function save() {
     if (status === 'cancelled' && o.status !== 'cancelled' && !(await confirm({ title: 'Cancel this order?', text: 'Stock will be returned to inventory.', confirmText: 'Cancel order', danger: true }))) return;
     setBusy(true);
     try {
-      await api(`/admin/orders/${orderNo}/status`, { method: 'PATCH', body: { status, courier: courier.trim() || null, tracking_code: track.trim() || null } });
+      await api(`/admin/orders/${orderNo}/status`, { method: 'PATCH', body: { status, courier: courier.trim() || null, tracking_code: track.trim() || null, invoice_no: inv.trim() } });
       toast.ok('Order updated'); reload(); onChanged();
     } catch (e) { toast.error(e.message); } finally { setBusy(false); }
   }
@@ -304,6 +305,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
             <h4 style={{ marginBottom: 8 }}>Update order</h4>
             <Field label="Status"><select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
               {ORDER_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}</select></Field>
+            <Field label="Invoice no. (optional)" hint="Shown to the customer on the invoice, SMS and order page. Empty = the website's own number."><input className="input" maxLength={40} value={inv} onChange={(e) => setInv(e.target.value)} placeholder={o.order_no} /></Field>
             <div className="row2">
               <Field label="Courier"><input className="input" value={courier} onChange={(e) => setCourier(e.target.value)} placeholder="e.g. Pathao" /></Field>
               <Field label="Tracking code"><input className="input" value={track} onChange={(e) => setTrack(e.target.value)} /></Field>
