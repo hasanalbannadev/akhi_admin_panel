@@ -265,7 +265,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
   const showInvoice = () => setInvoice(true);
 
   return (
-    <Modal title={`Order ${orderNo}`} size="wide" onClose={onClose}>
+    <Modal title={`Order ${orderNo}${o && o.invoice_no ? ` · Invoice ${o.invoice_no}` : ''}`} size="wide" onClose={onClose}>
       {loading ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : o && (<>
         {o.cancel_requested && o.status !== 'cancelled' && (
           <div className="infobox" style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -279,7 +279,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
           <div>
             <h4 style={{ marginBottom: 8 }}>Items</h4>
             {o.items.map((i, k) => (
-              <div className="list-item" key={k}><div className="grow"><b>{i.name}</b><span className="muted sm">{money(i.unit_price)} × {i.quantity}</span></div><b>{money(i.unit_price * i.quantity)}</b></div>
+              <div className="list-item" key={k}><div className="grow"><b>{i.name}</b>{i.product_code && <span className="muted sm">Code {i.product_code}</span>}<span className="muted sm">{money(i.unit_price)} × {i.quantity}</span></div><b>{money(i.unit_price * i.quantity)}</b></div>
             ))}
             <div style={{ marginTop: 10 }}>
               <div className="sum-row"><span>Subtotal</span><span>{money(o.subtotal)}</span></div>

@@ -47,7 +47,7 @@ export default function InvoiceModal({ orderNo, onClose }) {
       )}>
       {!inv ? <Loading /> : (
         <div id="invoice">
-          <div className="flex sp"><div><b style={{ fontSize: 18 }}>{SHOP.name}</b><div className="muted sm">Invoice {inv.invoice_no}</div></div><div className="muted sm">{dt(inv.date)}</div></div>
+          <div className="flex sp"><div><b style={{ fontSize: 18 }}>{SHOP.name}</b><div className="muted sm">Invoice {inv.invoice_no}</div>{inv.invoice_no !== orderNo && <div className="muted sm">Site order no. {orderNo}</div>}</div><div className="muted sm">{dt(inv.date)}</div></div>
           <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '14px 0' }} />
           <div className="sm"><b>{inv.customer.name}</b> · {inv.customer.phone}<br />{inv.ship_to.address}, {inv.ship_to.area ? `${inv.ship_to.area}, ` : ''}{inv.ship_to.district}</div>
           <table className="tbl compact" style={{ margin: '14px 0', minWidth: 0 }}>
