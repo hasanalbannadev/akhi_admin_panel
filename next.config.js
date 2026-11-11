@@ -4,7 +4,7 @@
  * and the same build works on localhost and on your server.
  * Set BACKEND_URL in .env.local (default: http://150.136.74.154:8001).
  */
-const BACKEND = (process.env.BACKEND_URL || 'http://150.136.74.154:8001').replace(/\/$/, '');
+const BACKEND = (process.env.BACKEND_URL || 'http://127.0.0.1:8001').replace(/\/$/, '');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
