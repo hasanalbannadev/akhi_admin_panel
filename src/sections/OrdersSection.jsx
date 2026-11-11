@@ -279,7 +279,7 @@ function OrderDetail({ orderNo, onClose, onChanged }) {
           <div>
             <h4 style={{ marginBottom: 8 }}>Items</h4>
             {o.items.map((i, k) => (
-              <div className="list-item" key={k}><div className="grow"><b>{i.name}</b>{i.product_code && <span className="muted sm">Code {i.product_code}</span>}<span className="muted sm">{money(i.unit_price)} × {i.quantity}</span></div><b>{money(i.unit_price * i.quantity)}</b></div>
+              <div className="list-item" key={k}><div className="grow"><b>{i.name}</b>{i.product_code && <span className="muted sm">Product code {i.product_code}</span>}<span className="muted sm">{money(i.unit_price)} × {i.quantity}</span></div><b>{money(i.unit_price * i.quantity)}</b></div>
             ))}
             <div style={{ marginTop: 10 }}>
               <div className="sum-row"><span>Subtotal</span><span>{money(o.subtotal)}</span></div>

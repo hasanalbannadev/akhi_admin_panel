@@ -81,7 +81,7 @@ function ProductList({ onAdd, onEdit }) {
   const Name = ({ p }) => (
     <div className="cell-prod">
       <Thumb src={p.images?.[0]?.url} />
-      <div className="t"><b>{p.name}</b><small>{p.sku ? `Code ${p.sku} · ` : ''}{catName[p.category_id] || 'No category'}</small></div>
+      <div className="t"><b>{p.name}</b><small>{p.sku ? `Product code ${p.sku} · ` : ''}{catName[p.category_id] || 'No category'}</small></div>
     </div>
   );
 
