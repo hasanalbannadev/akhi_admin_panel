@@ -81,7 +81,7 @@ function ProductList({ onAdd, onEdit }) {
   const Name = ({ p }) => (
     <div className="cell-prod">
       <Thumb src={p.images?.[0]?.url} />
-      <div className="t"><b>{p.name}</b><small>{p.sku ? `SKU ${p.sku} · ` : ''}{catName[p.category_id] || 'No category'}</small></div>
+      <div className="t"><b>{p.name}</b><small>{p.sku ? `Code ${p.sku} · ` : ''}{catName[p.category_id] || 'No category'}</small></div>
     </div>
   );
 
@@ -103,7 +103,7 @@ function ProductList({ onAdd, onEdit }) {
   return (
     <div>
       <div className="toolbar">
-        <SearchBox value={q} onChange={setQ} placeholder="Search products…" />
+        <SearchBox value={q} onChange={setQ} placeholder="Search name or code…" />
         <div className="tabs">
           {[['all', 'All'], ['active', 'Active'], ['hidden', 'Hidden'], ['low', 'Low stock']].map(([k, t]) => (
             <button key={k} className={`tab ${filter === k ? 'on' : ''}`} onClick={() => setFilter(k)}>{t}</button>
@@ -293,7 +293,7 @@ function ProductForm({ id, onDone }) {
           <div className="card"><div className="hd"><h3>Inventory</h3></div><div className="bd">
             <div className="row2">
               <Field label="Stock" hint={colors.length ? 'Taken from the colours below' : undefined}><input className="input" type="number" min="0" value={colors.length ? colorStock : f.stock} onChange={set('stock')} disabled={colors.length > 0} /></Field>
-              <Field label="SKU"><input className="input" value={f.sku} onChange={set('sku')} /></Field>
+              <Field label="Product code (SKU)" hint="e.g. 401. Customers see this code and can search with it. Must be unique."><input className="input" value={f.sku} onChange={set('sku')} /></Field>
             </div>
             <label className="check"><input type="checkbox" checked={f.is_active} onChange={set('is_active')} /> Visible in the shop</label>
           </div></div>

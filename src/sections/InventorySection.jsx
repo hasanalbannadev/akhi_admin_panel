@@ -50,7 +50,7 @@ export default function InventorySection() {
   }
 
   const lowCols = [
-    { h: 'Product', cell: (p) => <div><b>{p.name}</b>{p.sku && <div className="muted sm">SKU {p.sku}</div>}</div> },
+    { h: 'Product', cell: (p) => <div><b>{p.name}</b>{p.sku && <div className="muted sm">Code {p.sku}</div>}</div> },
     { h: 'Stock', cell: (p) => <Badge tone={p.stock === 0 ? 'red' : 'amber'}>{p.stock === 0 ? 'Out of stock' : `${p.stock} left`}</Badge> },
     { h: '', cls: 'r', cell: (p) => <button className="btn sm" onClick={() => openAdjust(p)}><Icon name="plus" size={14} /> Adjust</button> },
   ];
