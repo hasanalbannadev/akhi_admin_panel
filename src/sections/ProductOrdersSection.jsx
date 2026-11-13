@@ -19,13 +19,14 @@ export default function ProductOrdersSection() {
   const [to, setTo] = useState(bdDay());
   const [all, setAll] = useState(false);
   const [status, setStatus] = useState('');
+  const [only, setOnly] = useState(false);
   const [qIn, setQIn] = useState('');
   const [q, setQ] = useState('');
   useEffect(() => { const t = setTimeout(() => setQ(qIn.trim()), 350); return () => clearTimeout(t); }, [qIn]);
 
   const { data, loading, error, reload } = useAsync(
-    () => api('/admin/reports/product-orders', { query: { date_from: from, date_to: to, status, q, all_time: all } }),
-    [from, to, status, q, all], { every: 15000 });
+    () => api('/admin/reports/product-orders', { query: { date_from: from, date_to: to, status, q, all_time: all, only_ordered: only } }),
+    [from, to, status, q, all, only], { every: 15000 });
 
   const range = (a, b) => { setAll(false); setFrom(bdDay(a)); setTo(bdDay(b)); };
   const label = all ? 'All time' : from === to ? (from === bdDay() ? 'Today' : from === bdDay(-1) ? 'Yesterday' : from) : `${from} to ${to}`;
@@ -36,8 +37,8 @@ export default function ProductOrdersSection() {
   const columns = [
     { h: 'Product', cell: (p) => (
       <div className="flex gap center"><Thumb src={p.image} /><div><b>{p.name}</b>{p.sku ? <div className="muted sm">Product code {p.sku}</div> : null}</div></div>) },
-    { h: 'Orders', cell: (p) => <b>{p.orders}</b> },
-    { h: 'Pieces', cell: (p) => <b>{p.qty}</b> },
+    { h: 'Orders', cell: (p) => (p.orders ? <b>{p.orders}</b> : <span className="muted">0</span>) },
+    { h: 'Pieces', cell: (p) => (p.qty ? <b>{p.qty}</b> : <span className="muted">0</span>) },
     ...sts.map((s) => ({ h: cap(s), cell: (p) => (p.by_status[s] ? <div>{p.by_status[s].qty}<div className="muted sm">{p.by_status[s].orders} order{p.by_status[s].orders > 1 ? 's' : ''}</div></div> : <span className="muted">—</span>) })),
     { h: 'Sales', cell: (p) => money(p.revenue) },
   ];
@@ -62,6 +63,7 @@ export default function ProductOrdersSection() {
           <option value="">All statuses</option>
           {['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'].map((s) => <option key={s} value={s}>{cap(s)}</option>)}
         </select>
+        <label className="flex gap center sm" style={{ cursor: 'pointer' }}><input type="checkbox" checked={only} onChange={(e) => setOnly(e.target.checked)} /> Only products with orders</label>
         <div style={{ flex: 1, minWidth: 200 }}><SearchBox value={qIn} onChange={setQIn} placeholder="Search product name or code…" /></div>
       </div>
       <ErrorBox error={error} onRetry={reload} />
@@ -78,7 +80,7 @@ export default function ProductOrdersSection() {
       )}
 
       <div className="card flush"><div className="bd">
-        {loading && !data ? <Loading /> : rows.length === 0 ? <Empty icon="box" text="No orders for this period" /> : (
+        {loading && !data ? <Loading /> : rows.length === 0 ? <Empty icon="box" text="No products" /> : (
           <DataTable columns={columns} rows={rows} rowKey="product_id" mobile={(p) => (
             <div>
               <div className="flex gap center"><Thumb src={p.image} /><div><b>{p.name}</b>{p.sku ? <div className="muted sm">Product code {p.sku}</div> : null}</div></div>
