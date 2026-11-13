@@ -16,6 +16,9 @@ import { dt, money, toLocalInput } from '@/lib/format';
 const BLANK = { code: '', kind: 'percent', value: '', min_subtotal: 0, max_discount: '', usage_limit: '', per_user_limit: 1, starts_at: '', expires_at: '', is_active: true,
   scope: 'all', product_ids: [], category_ids: [], popup_enabled: false, popup_title: '', popup_text: '', popup_image: [], popup_button_text: '', popup_link: '', popup_seconds: 2, popup_only: false, pay_methods: [] };
 
+// the server may send the payment methods as a list or as comma text; always work with a list
+const asList = (v) => (Array.isArray(v) ? v : typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean) : []);
+
 export default function CouponsSection() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -23,11 +26,11 @@ export default function CouponsSection() {
   const pm = useAsync(() => api('/admin/payment-methods'), []);
   const [edit, setEdit] = useState(null);
   const [busy, setBusy] = useState(false);
-  const rows = data || [];
+  const rows = Array.isArray(data) ? data : [];
   // the payment methods a coupon can be limited to (same keys the checkout uses)
   const payOptions = [{ key: 'cod', label: 'Cash on delivery' }, { key: 'sslcommerz', label: 'Online payment (SSLCommerz)' },
-    ...((pm.data || []).filter((m) => m.is_active).map((m) => ({ key: `pm_${m.id}`, label: m.title })))];
-  const togglePay = (k) => setEdit((s) => ({ ...s, pay_methods: s.pay_methods.includes(k) ? s.pay_methods.filter((x) => x !== k) : [...s.pay_methods, k] }));
+    ...((Array.isArray(pm.data) ? pm.data : []).filter((m) => m.is_active).map((m) => ({ key: `pm_${m.id}`, label: m.title })))];
+  const togglePay = (k) => setEdit((s) => ({ ...s, pay_methods: asList(s.pay_methods).includes(k) ? asList(s.pay_methods).filter((x) => x !== k) : [...asList(s.pay_methods), k] }));
 
   async function open(c) {
     if (!c) return setEdit({ ...BLANK });
@@ -36,7 +39,7 @@ export default function CouponsSection() {
       setEdit({ ...BLANK, ...f, max_discount: f.max_discount ?? '', usage_limit: f.usage_limit ?? '', starts_at: toLocalInput(f.starts_at), expires_at: toLocalInput(f.expires_at),
         popup_title: f.popup_title || '', popup_text: f.popup_text || '', popup_button_text: f.popup_button_text || '', popup_link: f.popup_link || '',
         popup_image: f.popup_image ? [f.popup_image] : [], product_ids: f.product_ids || [], category_ids: f.category_ids || [],
-        popup_only: !!f.popup_only, pay_methods: f.pay_methods || [] });
+        popup_only: !!f.popup_only, pay_methods: asList(f.pay_methods) });
     } catch (e) { toast.error(e.message); }
   }
   const set = (k) => (e) => setEdit((s) => ({ ...s, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -50,7 +53,7 @@ export default function CouponsSection() {
       if (edit.kind === 'percent' && v > 100) return toast.error('Percent cannot exceed 100');
     } else if (!edit.popup_image[0] && !edit.popup_title.trim()) return toast.error('Add a banner image (or at least a title) for the pop-up');
     const body = {
-      popup_only: only, pay_methods: only ? [] : edit.pay_methods,
+      popup_only: only, pay_methods: only ? [] : asList(edit.pay_methods),
       code: edit.code.trim().toUpperCase(), kind: only ? 'percent' : edit.kind, value: only ? 0 : v, min_subtotal: Number(edit.min_subtotal) || 0,
       max_discount: edit.max_discount === '' ? null : Number(edit.max_discount),
       usage_limit: edit.usage_limit === '' ? null : parseInt(edit.usage_limit, 10),
@@ -90,7 +93,7 @@ export default function CouponsSection() {
     { h: 'Discount', cell: (c) => c.popup_only ? <span className="muted">—</span> : <div>{val(c)}{c.max_discount ? <div className="muted sm">max {money(c.max_discount)}</div> : null}</div> },
     { h: 'Applies to', cell: (c) => (c.popup_only ? <span className="muted sm">Pop-up only</span> : (
       <span className="muted sm">{c.scope === 'products' ? `${(c.product_ids || []).length} products` : c.scope === 'categories' ? `${(c.category_ids || []).length} categories` : 'All products'}
-        {(c.pay_methods || []).length > 0 && <div>{c.pay_methods.length} payment method{c.pay_methods.length > 1 ? 's' : ''} only</div>}</span>)) },
+        {asList(c.pay_methods).length > 0 && <div>{asList(c.pay_methods).length} payment method{asList(c.pay_methods).length > 1 ? 's' : ''} only</div>}</span>)) },
     { h: 'Min order', cell: (c) => (c.min_subtotal ? money(c.min_subtotal) : '—') },
     { h: 'Used', cell: (c) => `${c.used_count}${c.usage_limit ? ` / ${c.usage_limit}` : ''}` },
     { h: 'Valid until', cell: (c) => <span className="muted">{c.expires_at ? dt(c.expires_at, false) : 'No expiry'}</span> },
@@ -154,10 +157,10 @@ export default function CouponsSection() {
           <div className="hint muted sm" style={{ margin: '-4px 0 10px' }}>While this coupon is active and valid, products it covers do not get their offer price at checkout; offers return when the coupon ends.</div>
           <div style={{ marginBottom: 12 }}>
             <b>Works with these payment methods</b>
-            <div className="muted sm" style={{ margin: '2px 0 6px' }}>{edit.pay_methods.length ? 'Only the ticked methods accept this coupon. With any other method the customer sees “this coupon does not work with this payment method”.' : 'Nothing ticked = the coupon works with every payment method.'}</div>
+            <div className="muted sm" style={{ margin: '2px 0 6px' }}>{asList(edit.pay_methods).length ? 'Only the ticked methods accept this coupon. With any other method the customer sees “this coupon does not work with this payment method”.' : 'Nothing ticked = the coupon works with every payment method.'}</div>
             <div className="flex gap" style={{ flexWrap: 'wrap' }}>
               {payOptions.map((o) => (
-                <label className="check" key={o.key}><input type="checkbox" checked={edit.pay_methods.includes(o.key)} onChange={() => togglePay(o.key)} /> {o.label}</label>
+                <label className="check" key={o.key}><input type="checkbox" checked={asList(edit.pay_methods).includes(o.key)} onChange={() => togglePay(o.key)} /> {o.label}</label>
               ))}
             </div>
           </div>
