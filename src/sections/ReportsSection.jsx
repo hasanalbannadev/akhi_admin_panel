@@ -16,12 +16,20 @@ const COLORS = ['#e83e8c', '#3b82f6', '#16a870', '#e29a0d', '#8b5cf6', '#06b6d4'
 export default function ReportsSection() {
   const { isOwner } = useAuth();
   const [days, setDays] = useState(30);
+  const [allTime, setAllTime] = useState(false);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  // all time > custom dates > N days
+  const custom = !allTime && (from || to);
+  const query = allTime ? { all_time: true } : custom ? { date_from: from || undefined, date_to: to || undefined } : { days };
+  const key = JSON.stringify(query);
+  const pick = (n) => { setAllTime(false); setFrom(''); setTo(''); setDays(n); };
   const own = (fn) => (isOwner ? fn() : Promise.resolve(null));
 
-  const sales = useAsync(() => own(() => api('/admin/reports/sales', { query: { days } })), [days, isOwner]);
-  const profit = useAsync(() => own(() => api('/admin/reports/profit', { query: { days } })), [days, isOwner]);
-  const top = useAsync(() => own(() => api('/admin/reports/top-customers', { query: { days } })), [days, isOwner]);
-  const summary = useAsync(() => api('/admin/reports/orders-summary', { query: { days } }), [days]);
+  const sales = useAsync(() => own(() => api('/admin/reports/sales', { query })), [key, isOwner]);
+  const profit = useAsync(() => own(() => api('/admin/reports/profit', { query })), [key, isOwner]);
+  const top = useAsync(() => own(() => api('/admin/reports/top-customers', { query })), [key, isOwner]);
+  const summary = useAsync(() => api('/admin/reports/orders-summary', { query }), [key]);
   const low = useAsync(() => api('/admin/reports/low-stock', { query: { threshold: 5 } }), [], { every: 30000 });
 
   const pts = (sales.data?.daily || []).map((r) => ({ label: r.date.slice(5).replace('-', '/'), full: r.date, value: r.revenue, extra: `${r.orders} orders` }));
@@ -36,7 +44,16 @@ export default function ReportsSection() {
   return (
     <div>
       <div className="toolbar">
-        <div className="seg">{[7, 30, 90, 365].map((n) => <button key={n} className={days === n ? 'on' : ''} onClick={() => setDays(n)}>{n === 365 ? '1 year' : `${n} days`}</button>)}</div>
+        <div className="seg">
+          {[7, 30, 90, 365].map((n) => <button key={n} className={!allTime && !custom && days === n ? 'on' : ''} onClick={() => pick(n)}>{n === 365 ? '1 year' : `${n} days`}</button>)}
+          <button className={allTime ? 'on' : ''} onClick={() => { setAllTime(true); setFrom(''); setTo(''); }}>All time</button>
+        </div>
+        <div className="row" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span className="muted sm">Custom:</span>
+          <input type="date" className="input" style={{ width: 150 }} value={from} max={to || undefined} onChange={(e) => { setAllTime(false); setFrom(e.target.value); }} />
+          <span className="muted sm">to</span>
+          <input type="date" className="input" style={{ width: 150 }} value={to} min={from || undefined} onChange={(e) => { setAllTime(false); setTo(e.target.value); }} />
+        </div>
       </div>
       {!isOwner && <div className="infobox">Sales, profit and top-customer reports are for the owner account. You can see the order summary and low stock below.</div>}
 
