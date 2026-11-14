@@ -28,7 +28,7 @@ const SRC_LABEL = { facebook: 'Facebook', instagram: 'Instagram' };
 let warnedSetup = false;
 
 /** Comments, post by post: every Facebook / Instagram post with its comments underneath, reply right here. */
-function PostsView({ header, toast, onRead, src, confirm }) {
+function PostsView({ header, toast, onRead, src, confirm, view = 'posts' }) {
   const [items, setItems] = useState([]);
   const [next, setNext] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -40,9 +40,35 @@ function PostsView({ header, toast, onRead, src, confirm }) {
   const [up, setUp] = useState(false);
   const [mentions, setMentions] = useState({});
   const [mentionMenu, setMentionMenu] = useState(false);
+  const [person, setPerson] = useState(null);
+  const [pq, setPq] = useState('');
+  const [filter, setFilter] = useState(null);       // blocked words panel
+  const [word, setWord] = useState('');
   const fileRef = useRef(null);
 
+  async function loadPeople() {                      // By person: read several pages of posts, then group the commenters
+    setLoading(true);
+    try {
+      let after; let all = []; let nx = null; let e = null;
+      for (let i = 0; i < 4; i += 1) {
+        const r = await api('/admin/chat/posts', { query: { source: src, after: after || undefined } });
+        if (r.error) { e = r.error; break; }
+        all = all.concat(r.posts || []); nx = r.next || null; after = nx;
+        if (!nx) break;
+      }
+      if (e) { setErr(e); toast.error(e); } else setErr(null);
+      setItems(all); setNext(nx);
+    } catch (er) { setErr(er.message); toast.error(er.message); } finally { setLoading(false); }
+  }
+  async function openFilter() {
+    try { setFilter(await api('/admin/chat/filter')); } catch (er) { toast.error(er.message); }
+  }
+  async function saveFilter(f) {
+    try { setFilter(await api('/admin/chat/filter', { method: 'PUT', body: f })); toast.ok('Saved'); load(); } catch (er) { toast.error(er.message); }
+  }
+
   async function load(after) {
+    if (view === 'people' && !after) return loadPeople();
     setLoading(true);
     try {
       const r = await api('/admin/chat/posts', { query: { source: src, after: after || undefined } });
@@ -52,9 +78,9 @@ function PostsView({ header, toast, onRead, src, confirm }) {
     } catch (e) { setErr(e.message); toast.error(e.message); } finally { setLoading(false); }
   }
   useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
-    setItems([]); setRep(null); setNext(null); load();
+    setItems([]); setRep(null); setNext(null); setPerson(null); load();
     api('/admin/chat/comments/mark-read', { method: 'POST', query: { source: src } }).then(() => { window.dispatchEvent(new CustomEvent('badges-refresh')); if (onRead) onRead(); }).catch(() => {});
-  }, [src]);
+  }, [src, view]);
   useEffect(() => {
     const rt = (e) => { if (e.detail && e.detail.t === 'chat') load(); };
     window.addEventListener('rt-push', rt);
@@ -83,12 +109,26 @@ function PostsView({ header, toast, onRead, src, confirm }) {
     try { await api('/admin/chat/comments/action', { method: 'POST', body: { source: src, comment_id: c.id, action } }); toast.ok('Done'); load(); }
     catch (er) { toast.error(er.message); }
   }
+  const mineOf = (c) => (person ? (c.uid || c.name) === person.key && !c.mine : false);
+  const hasPerson = (c) => mineOf(c) || (c.replies || []).some(hasPerson);
+  const people = (() => {
+    const m = new Map();
+    const walk = (cs) => cs.forEach((c) => {
+      if (!c.mine) { const k = c.uid || c.name; const e = m.get(k) || { key: k, name: c.name, count: 0, last: '', flagged: 0 }; e.count += 1; if ((c.time || '') > e.last) e.last = c.time || ''; if (c.flag) e.flagged += 1; m.set(k, e); }
+      walk(c.replies || []);
+    });
+    items.forEach((p) => walk(p.comments || []));
+    return [...m.values()].sort((a, b) => (b.last || '').localeCompare(a.last || ''));
+  })();
+  const shown = view === 'people' && person
+    ? items.map((p) => ({ ...p, comments: (p.comments || []).filter(hasPerson) })).filter((p) => p.comments.length)
+    : items;
   const comment = (c, d, top, post) => (
     <div key={c.id} style={{ marginLeft: d ? 26 : 0, padding: '8px 10px', borderRadius: 10, background: c.mine ? 'var(--pink-l, #fde8f1)' : 'transparent', marginTop: 4 }}>
       <div className="flex gap" style={{ alignItems: 'flex-start' }}>
         <div className="avatar" style={{ width: 28, height: 28, fontSize: 12, flex: '0 0 28px' }}>{(c.name || '?').slice(0, 1).toUpperCase()}</div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div className="flex gap center" style={{ flexWrap: 'wrap' }}><b>{c.name}</b>{c.mine && <Badge tone="pink">You</Badge>}<span className="muted sm">{c.time ? timeAgo(c.time) : ''}{c.likes ? ` · 👍 ${c.likes}` : ''}</span></div>
+          <div className="flex gap center" style={{ flexWrap: 'wrap' }}><b>{c.name}</b>{c.mine && <Badge tone="pink">You</Badge>}{c.flag && <span className="sm" style={{ background: '#fef3f2', color: '#b42318', border: '1px solid #fecdca', borderRadius: 8, padding: '0 6px' }}>🚫 blocked word: {c.flag}</span>}<span className="muted sm">{c.time ? timeAgo(c.time) : ''}{c.likes ? ` · 👍 ${c.likes}` : ''}</span></div>
           {c.text && <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.text}</div>}
           {c.image && <img src={c.image} alt="" style={{ display: 'block', maxWidth: 200, maxHeight: 200, borderRadius: 8, marginTop: 4 }} />}
           {c.hidden && <span className="muted sm">🙈 hidden</span>}
@@ -131,12 +171,47 @@ function PostsView({ header, toast, onRead, src, confirm }) {
     <div className="card" style={{ overflow: 'hidden' }}>
       {header}
       <div style={{ padding: '10px 12px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid var(--line)' }}>
-        <b style={{ alignSelf: 'center' }}>{src === 'instagram' ? 'Instagram posts' : 'Facebook posts'}</b>
-        <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => load()} disabled={loading}>↻ Refresh</button>
+        <b style={{ alignSelf: 'center' }}>{view === 'people' ? (person ? '' : (src === 'instagram' ? 'Instagram people' : 'Facebook people')) : (src === 'instagram' ? 'Instagram posts' : 'Facebook posts')}</b>
+        {view === 'people' && person && <button className="btn sm" onClick={() => setPerson(null)}>← All people</button>}
+        {view === 'people' && person && <b style={{ alignSelf: 'center' }}>{person.name}</b>}
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button className="btn sm" onClick={openFilter}>🛡 Filter</button>
+          <button className="btn sm" onClick={() => load()} disabled={loading}>↻ Refresh</button>
+        </span>
       </div>
+      {filter && (
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line)', background: '#fff' }}>
+          <div className="flex sp center" style={{ marginBottom: 6 }}>
+            <b>Blocked words</b>
+            <button type="button" className="btn sm" onClick={() => setFilter(null)} aria-label="Close">✕</button>
+          </div>
+          <label className="flex gap center sm" style={{ marginBottom: 8 }}><input type="checkbox" checked={filter.auto_hide} onChange={(e) => saveFilter({ ...filter, auto_hide: e.target.checked })} /> Hide new comments that contain a blocked word automatically</label>
+          <div className="flex gap" style={{ marginBottom: 8 }}>
+            <input className="input" style={{ flex: 1, minWidth: 0 }} value={word} onChange={(e) => setWord(e.target.value)} placeholder="Add a word or phrase (Bangla or English)" maxLength={40}
+              onKeyDown={(e) => { if (e.key === 'Enter' && word.trim()) { e.preventDefault(); saveFilter({ ...filter, words: [...filter.words, word.trim()] }); setWord(''); } }} />
+            <button type="button" className="btn pri" disabled={!word.trim()} onClick={() => { saveFilter({ ...filter, words: [...filter.words, word.trim()] }); setWord(''); }}>Add</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {filter.words.length === 0 && <span className="muted sm">No words yet.</span>}
+            {filter.words.map((w) => <span key={w} className="sm" style={{ background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 14, padding: '2px 4px 2px 10px' }}>{w} <button type="button" aria-label={`Remove ${w}`} onClick={() => saveFilter({ ...filter, words: filter.words.filter((x) => x !== w) })} style={{ border: 0, background: 'none', cursor: 'pointer', color: '#b42318' }}>✕</button></span>)}
+          </div>
+          <div className="muted sm" style={{ marginTop: 6 }}>Comments with these words get a red mark here. With the box ticked, new ones are hidden on Facebook / Instagram automatically (you can Unhide any).</div>
+        </div>
+      )}
       <div style={{ padding: 12, background: '#f8f9fc' }}>
         {err && <div className="sm" style={{ color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 10, padding: '8px 10px', marginBottom: 10 }}>⚠ {err}</div>}
-        {loading && items.length === 0 ? <Loading /> : items.length === 0 && !err ? <Empty icon="chat" text="No posts yet" /> : items.map((p) => (
+        {view === 'people' && !person ? (loading && items.length === 0 ? <Loading /> : people.length === 0 && !err ? <Empty icon="chat" text="No comments yet" /> : (
+          <>
+            <input className="input" style={{ width: '100%', marginBottom: 10 }} placeholder="Search a person…" value={pq} onChange={(e) => setPq(e.target.value)} />
+            {people.filter((x) => x.name.toLowerCase().includes(pq.toLowerCase())).map((x) => (
+              <button key={x.key} type="button" className="card flex center gap" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: 8, cursor: 'pointer' }} onClick={() => setPerson(x)}>
+                <div className="avatar">{(x.name || '?').slice(0, 1).toUpperCase()}</div>
+                <div style={{ flex: 1, minWidth: 0 }}><b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.name}</b><span className="muted sm">{x.count} comment{x.count > 1 ? 's' : ''}{x.last ? ` · ${timeAgo(x.last)}` : ''}</span></div>
+                {x.flagged > 0 && <span className="sm" style={{ background: '#fef3f2', color: '#b42318', border: '1px solid #fecdca', borderRadius: 8, padding: '0 6px' }}>🚫 {x.flagged}</span>}
+              </button>
+            ))}
+          </>
+        )) : loading && items.length === 0 ? <Loading /> : shown.length === 0 && !err ? <Empty icon="chat" text="No posts yet" /> : shown.map((p) => (
           <div key={p.id} className="card" style={{ marginBottom: 14, overflow: 'hidden' }}>
             {p.image && <div style={{ background: '#eef0f6', textAlign: 'center' }}><img src={p.image} alt="" style={{ display: 'block', margin: '0 auto', maxWidth: '100%', maxHeight: 300, objectFit: 'contain' }} /></div>}
             <div style={{ padding: '10px 12px' }}>
@@ -286,8 +361,8 @@ export default function ChatSection() {
           ))}
         </div>
       )}
-      {isCom && cview === 'posts' ? (
-        <PostsView key={channel} src={channel === 'igcomments' ? 'instagram' : 'facebook'} confirm={confirm} header={<>{tabsRow}{subRow}</>} toast={toast} onRead={() => counts.reload()} />
+      {isCom ? (
+        <PostsView key={`${channel}-${cview}`} view={cview} src={channel === 'igcomments' ? 'instagram' : 'facebook'} confirm={confirm} header={<>{tabsRow}{subRow}</>} toast={toast} onRead={() => counts.reload()} />
       ) : (
       <div className={`card chat ${sel ? 'open' : ''}`}>
         <div className="threads">
@@ -332,7 +407,7 @@ export default function ChatSection() {
               <div className="msgs">
                 {msgs.loading && !msgs.data ? <Loading /> : (msgs.data || []).map((m) => (
                   <div key={m.id} className={`bubble ${m.direction === 'out' ? 'out' : ''}`} style={{ position: 'relative', marginBottom: m.reaction ? 14 : undefined }}>
-                    {(m.media || []).map((a, i) => (a.type === 'post' ? (
+                    {(m.media || []).map((a, i) => (a.type === 'flag' ? <div key={i} className="sm" style={{ color: '#b42318', marginBottom: 4 }}>{a.text}</div> : a.type === 'post' ? (
                       <a key={i} href={a.link || undefined} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none', color: 'inherit', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', marginBottom: 8, maxWidth: 260, background: 'rgba(0,0,0,.03)' }}>
                         {a.image && <img src={a.image} alt="" style={{ display: 'block', width: '100%', maxHeight: 150, objectFit: 'cover' }} />}
                         <div className="sm" style={{ padding: '6px 8px' }}><b>On this {a.src === 'instagram' ? 'Instagram post' : 'Facebook post'}{a.link ? ' ↗' : ''}</b>{a.text && <div style={{ opacity: 0.8, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{a.text}</div>}</div>
