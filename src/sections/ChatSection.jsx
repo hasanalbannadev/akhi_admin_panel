@@ -38,6 +38,8 @@ function PostsView({ header, toast, onRead, src, confirm }) {
   const [img, setImg] = useState(null);
   const [busy, setBusy] = useState(false);
   const [up, setUp] = useState(false);
+  const [mentions, setMentions] = useState({});
+  const [mentionMenu, setMentionMenu] = useState(false);
   const fileRef = useRef(null);
 
   async function load(after) {
@@ -71,8 +73,8 @@ function PostsView({ header, toast, onRead, src, confirm }) {
     if (!rep || busy || up || (!text.trim() && !img)) return;
     setBusy(true);
     try {
-      await api('/admin/chat/comments/reply', { method: 'POST', body: { source: src, comment_id: rep.target, text: text.trim(), image_url: img ? img.url : undefined } });
-      setText(''); setImg(null); setRep(null); toast.ok('Reply sent'); load();
+      await api('/admin/chat/comments/reply', { method: 'POST', body: { source: src, comment_id: rep.target, text: Object.entries(mentions).reduce((t, [n, u]) => t.split(`@${n}`).join(`@[${u}]`), text.trim()), image_url: img ? img.url : undefined } });
+      setText(''); setImg(null); setRep(null); setMentions({}); setMentionMenu(false); toast.ok('Reply sent'); load();
     } catch (er) { toast.error(er.message); } finally { setBusy(false); }
   }
 
@@ -81,7 +83,7 @@ function PostsView({ header, toast, onRead, src, confirm }) {
     try { await api('/admin/chat/comments/action', { method: 'POST', body: { source: src, comment_id: c.id, action } }); toast.ok('Done'); load(); }
     catch (er) { toast.error(er.message); }
   }
-  const comment = (c, d, top) => (
+  const comment = (c, d, top, post) => (
     <div key={c.id} style={{ marginLeft: d ? 26 : 0, padding: '8px 10px', borderRadius: 10, background: c.mine ? 'var(--pink-l, #fde8f1)' : 'transparent', marginTop: 4 }}>
       <div className="flex gap" style={{ alignItems: 'flex-start' }}>
         <div className="avatar" style={{ width: 28, height: 28, fontSize: 12, flex: '0 0 28px' }}>{(c.name || '?').slice(0, 1).toUpperCase()}</div>
@@ -92,7 +94,8 @@ function PostsView({ header, toast, onRead, src, confirm }) {
           {c.hidden && <span className="muted sm">🙈 hidden</span>}
           <div className="flex gap muted sm" style={{ flexWrap: 'wrap' }}>
             <button type="button" className="muted sm" style={{ border: 0, background: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 600 }} onClick={() => { setRep({ id: c.id, target: src === 'instagram' && d > 0 ? top : c.id, name: c.name }); setText(src === 'instagram' && !c.mine ? `@${c.name} ` : ''); setImg(null); }}>↩ Reply</button>
-            {src === 'facebook' && <button type="button" className="muted sm" style={{ border: 0, background: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 600 }} onClick={() => act(c, c.liked ? 'unlike' : 'like')}>{c.liked ? '👍 Liked' : '👍 Like'}</button>}
+            <button type="button" className="muted sm" style={{ border: 0, background: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 600 }} onClick={() => act(c, c.liked ? 'unlike' : 'like')}>{c.liked ? '👍 Liked' : '👍 Like'}</button>
+            {src === 'instagram' && <button type="button" className="muted sm" style={{ border: 0, background: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 600 }} onClick={() => act(c, 'unlike')}>Unlike</button>}
             <button type="button" className="muted sm" style={{ border: 0, background: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 600 }} onClick={() => act(c, c.hidden ? 'unhide' : 'hide')}>{c.hidden ? 'Unhide' : 'Hide'}</button>
             <button type="button" className="muted sm" style={{ border: 0, background: 'none', cursor: 'pointer', padding: '2px 0', fontWeight: 600, color: '#b42318' }} onClick={() => act(c, 'delete')}>Delete</button>
           </div>
@@ -107,12 +110,20 @@ function PostsView({ header, toast, onRead, src, confirm }) {
               <button type="button" className="btn" aria-label="Attach a photo" disabled={up} onClick={() => fileRef.current && fileRef.current.click()}>📷</button>
             </>}
             <input className="input" style={{ flex: 1, minWidth: 0 }} autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } }} placeholder={`Reply to ${c.name}…`} maxLength={1900} />
+            {src === 'facebook' && <button type="button" className="btn" aria-label="Mention someone" title="Mention" onClick={() => setMentionMenu(!mentionMenu)}>@</button>}
             <button type="button" className="btn pri" aria-label="Send reply" disabled={busy || up || (!text.trim() && !img)} onClick={send}><Icon name="send" size={15} /></button>
             <button type="button" className="btn" onClick={() => setRep(null)} aria-label="Cancel">✕</button>
           </div>
         </div>
       )}
-      {(c.replies || []).map((r) => comment(r, 1, top))}
+      {rep && rep.id === c.id && mentionMenu && src === 'facebook' && (
+        <div className="card" style={{ marginTop: 6, maxHeight: 160, overflowY: 'auto' }}>
+          {[...new Map(((post && post.comments) || []).flatMap((x) => [x, ...(x.replies || [])]).filter((x) => x.uid && !x.mine).map((x) => [x.uid, x])).values()].map((x) => (
+            <button key={x.uid} type="button" className="btn sm" style={{ display: 'block', width: '100%', textAlign: 'left', border: 0 }} onClick={() => { setMentions({ ...mentions, [x.name]: x.uid }); setText((t) => `${t}${t && !t.endsWith(' ') ? ' ' : ''}@${x.name} `); setMentionMenu(false); }}>@ {x.name}</button>
+          ))}
+        </div>
+      )}
+      {(c.replies || []).map((r) => comment(r, 1, top, post))}
     </div>
   );
 
@@ -133,7 +144,7 @@ function PostsView({ header, toast, onRead, src, confirm }) {
               <div className="muted sm" style={{ marginTop: 4 }}>{p.time ? dt(p.time) : ''} · 👍 {p.likes} · 💬 {p.comments_count}{p.link && <> · <a href={p.link} target="_blank" rel="noreferrer">View post ↗</a></>}</div>
             </div>
             <div style={{ padding: '0 8px 8px', borderTop: '1px solid var(--line)' }}>
-              {(p.comments || []).length === 0 ? <div className="muted sm" style={{ padding: 10 }}>No comments</div> : p.comments.map((c) => comment(c, 0, c.id))}
+              {(p.comments || []).length === 0 ? <div className="muted sm" style={{ padding: 10 }}>No comments</div> : p.comments.map((c) => comment(c, 0, c.id, p))}
             </div>
           </div>
         ))}
@@ -161,6 +172,7 @@ export default function ChatSection() {
   const fileRef = useRef(null);
   const endRef = useRef(null);
   const [cview, setCview] = useState('posts');
+  const [prof, setProf] = useState(null);
   const [q, setQ] = useState('');
   const isCom = channel === 'fbcomments' || channel === 'igcomments';
   const [health, setHealth] = useState(null);
@@ -171,6 +183,13 @@ export default function ChatSection() {
   const counts = useAsync(() => api('/admin/chat/channel-counts'), [], { every: 3000 });
   const msgs = useAsync(() => (sel ? api(`/admin/chat/threads/${sel.id}/messages`) : Promise.resolve([])), [sel?.id], { every: 1000 });
 
+  useEffect(() => {
+    setProf(null);
+    if (!sel) return;
+    let off = false;
+    api(`/admin/chat/threads/${sel.id}/profile`).then((p) => { if (!off) { setProf(p); if (p.name && p.name !== sel.name) threads.reload(); } }).catch(() => {});
+    return () => { off = true; };
+  }, [sel && sel.id]); // eslint-disable-line react-hooks/exhaustive-deps
   async function checkHealth() {
     try {
       const h = await api('/admin/chat/health');
@@ -284,6 +303,7 @@ export default function ChatSection() {
               <div className="avatar">{(t.name || '?').slice(0, 1).toUpperCase()}</div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div className="flex sp"><b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</b><span className="muted sm">{timeAgo(t.last_message_at)}</span></div>
+                {t.phone && <div className="muted sm">+{t.phone}</div>}
                 <div className="flex sp center gap">
                   <span className="muted sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.last_text || '—'}</span>
                   {t.unread > 0 && <span className="badge pink">{t.unread}</span>}
@@ -300,8 +320,11 @@ export default function ChatSection() {
             <>
               <div className="flex center gap" style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
                 <button className="btn sm back" onClick={() => setSel(null)}><Icon name="back" size={14} /></button>
-                <div className="avatar">{(sel.name || '?').slice(0, 1).toUpperCase()}</div>
-                <b style={{ flex: 1 }}>{sel.name}</b>
+                {prof && prof.pic ? <img src={prof.pic} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flex: '0 0 38px' }} /> : <div className="avatar">{((prof && prof.name) || sel.name || '?').slice(0, 1).toUpperCase()}</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(prof && prof.name) || sel.name}</b>
+                  {((prof && prof.sub) || sel.phone) && <span className="muted sm">{(prof && prof.sub) || `+${sel.phone}`}</span>}
+                </div>
                 {sel.channel && <Badge tone={CH_TONE[sel.channel] || 'blue'}>{sel.channel === 'comment' ? `${SRC_LABEL[sel.src] || ''} comment`.trim() : (CH_LABEL[sel.channel] || sel.channel)}</Badge>}
                 <button className="btn sm danger" onClick={remove}><Icon name="trash" size={14} /></button>
               </div>
