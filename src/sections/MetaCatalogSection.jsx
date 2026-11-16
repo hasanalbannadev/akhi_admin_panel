@@ -9,7 +9,7 @@ import { useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 
-const FIX_LABEL = { create_catalog: 'Create catalog', create_feed: 'Link my website feed', connect_waba: 'Connect to WhatsApp', show_catalog: 'Turn ON catalog icon & cart', upload_now: 'Fetch now' };
+const FIX_LABEL = { create_catalog: 'Create catalog', create_feed: 'Link my website feed', connect_waba: 'Connect to WhatsApp', show_catalog: 'Turn ON catalog icon & cart', upload_now: 'Fetch now', sync_sets: 'Create collections' };
 
 export default function MetaCatalogSection() {
   const toast = useToast();

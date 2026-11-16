@@ -26,6 +26,7 @@ export default function SeoSection() {
   const [edit, setEdit] = useState(null);
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
+  const [pinging, setPinging] = useState(false);
 
   const all = (data && data[tab]) || [];
   const rows = all.filter((r) => (!only || r.seo) && (r.name + ' ' + r.key).toLowerCase().includes(q.toLowerCase()));
@@ -43,6 +44,11 @@ export default function SeoSection() {
   async function remove(r) {
     if (!(await confirm({ title: 'Remove this SEO?', text: `${r.name} goes back to the automatic title and description.`, confirmText: 'Remove', danger: true }))) return;
     try { await api(`/admin/seo?kind=${tab}&key=${encodeURIComponent(r.key)}`, { method: 'DELETE' }); toast.ok('Removed'); reload(); } catch (e) { toast.error(e.message); }
+  }
+  async function notify() {
+    setPinging(true);
+    try { const r = await api('/admin/seo/notify', { method: 'POST' }); toast.ok(`Sent ${r.sent} links to Bing / Yandex and others`); }
+    catch (e) { toast.error(e.message); } finally { setPinging(false); }
   }
   const copy = (t) => { try { navigator.clipboard.writeText(t); toast.ok('Copied'); } catch { toast.error('Copy failed'); } };
 
@@ -65,8 +71,10 @@ export default function SeoSection() {
               <div className="muted sm">Every active product, category and page is listed by itself. Add or delete a product and the sitemap updates within an hour. Nothing to upload.</div>
               <div className="sm" style={{ marginTop: 4 }}><a href={`${SITE}/sitemap.xml`} target="_blank" rel="noreferrer">{SITE}/sitemap.xml ↗</a></div>
             </div>
-            <div className="flex gap">
+            <div className="flex gap wrap" style={{ maxWidth: '100%' }}>
               <button className="btn" onClick={() => copy(`${SITE}/sitemap.xml`)}>Copy link</button>
+              <button className="btn pri" disabled={pinging} onClick={notify} title="Sends every link to Bing, Yandex and other IndexNow search engines">{pinging ? 'Sending…' : 'Tell search engines now'}</button>
+              <a className="btn" href="https://search.google.com/search-console/sitemaps" target="_blank" rel="noreferrer">Open Google Search Console ↗</a>
               <button className="btn" onClick={() => setHelp(!help)}>Google Search Console</button>
             </div>
           </div>
@@ -75,6 +83,7 @@ export default function SeoSection() {
               <li>Open <b>search.google.com/search-console</b> and add your site (Domain or URL prefix) and verify it.</li>
               <li>Left menu → <b>Sitemaps</b> → type <code>sitemap.xml</code> → <b>Submit</b>. Do this once only.</li>
               <li>After that Google re-reads the sitemap by itself; new products are found automatically. You never submit it again.</li>
+              <li>Google does not accept instant pings from websites (no button can force it). It reads the sitemap on its own. "Tell search engines now" reaches Bing, Yandex, Naver and others only.</li>
               <li>To get one page indexed sooner: Search Console → <b>URL inspection</b> → paste the page link → <b>Request indexing</b>.</li>
             </ol>
           )}

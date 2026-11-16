@@ -5,7 +5,7 @@ import { Empty } from '@/components/ui';
 import { useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
 
-export default function ChatProductPicker({ thread, onClose, onSent }) {
+export default function ChatProductPicker({ thread, onClose, onSent, onPick }) {
   const toast = useToast();
   const [q, setQ] = useState('');
   const [items, setItems] = useState(null);
@@ -21,7 +21,9 @@ export default function ChatProductPicker({ thread, onClose, onSent }) {
 
   async function send(p) {
     setBusy(p.id);
-    try { await api(`/admin/chat/threads/${thread.id}/send-product`, { method: 'POST', body: { product_id: p.id } }); toast.ok('Product sent'); onSent(); }
+    try {
+      if (onPick) { await onPick(p); toast.ok('Product sent'); onSent(); return; }
+      await api(`/admin/chat/threads/${thread.id}/send-product`, { method: 'POST', body: { product_id: p.id } }); toast.ok('Product sent'); onSent(); }
     catch (e) { toast.error(e.message); } finally { setBusy(0); }
   }
 
