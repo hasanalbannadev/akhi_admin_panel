@@ -38,7 +38,6 @@ const NAV = [
   { href: '/delivery-zones', label: 'Delivery Zones', icon: 'truck' },
   { href: '/delivery-rules', label: 'Delivery Rules', icon: 'truck' },
   { href: '/reports', label: 'Reports', icon: 'chart' },
-  { href: '/accounts', label: 'Accounts', icon: 'wallet', owner: true },
   { href: '/company-accounts', label: 'Company Accounts', icon: 'chart', owner: true },
   { href: '/staff', label: 'Staff', icon: 'shield', owner: true },
   { href: '/settings', label: 'Settings', icon: 'cog' },

@@ -17,7 +17,8 @@ export default function MetaCatalogSection() {
   const info = useAsync(() => api('/admin/meta-feed/info'), []);
   const [busy, setBusy] = useState('');
   const [wl, setWl] = useState(null);                       // Auto catalog (welcome) settings
-  useEffect(() => { api('/admin/meta-catalog/welcome').then(setWl).catch(() => {}); }, []);
+  const [wlErr, setWlErr] = useState('');
+  useEffect(() => { api('/admin/meta-catalog/welcome').then(setWl).catch((e) => setWlErr(e.message || 'error')); }, []);
   async function saveWl() {
     try { const r = await api('/admin/meta-catalog/welcome', { method: 'PUT', body: wl }); setWl(r); toast.ok('Saved'); } catch (e) { toast.error(e.message); }
   }
@@ -54,6 +55,7 @@ export default function MetaCatalogSection() {
         </div>
       </div></div>
 
+      {!wl && wlErr && <div className="card" style={{ marginBottom: 14 }}><div className="bd"><b>Auto catalog for new chats</b> <Badge tone="red">backend not updated</Badge><div className="muted sm">The server still runs an old meta_catalog.py ("{wlErr}"). Put the new meta_catalog.py on the server and restart akhi_backend; this box then shows the ON/OFF switch and the delay.</div></div></div>}
       {wl && <div className="card" style={{ marginBottom: 14 }}><div className="bd">
         <div className="flex sp center gap wrap">
           <div><b>Auto catalog for new chats</b> <Badge tone={wl.on ? 'green' : 'gray'}>{wl.on ? 'ON' : 'OFF'}</Badge>
