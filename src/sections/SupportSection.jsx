@@ -12,6 +12,7 @@ import { useConfirm, useToast } from '@/components/Providers';
 import { api, assetUrl } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { dt, getParam, timeAgo } from '@/lib/format';
+import ChatProductPicker from './ChatProductPicker';
 
 // Customer avatar: profile photo when the customer has one, otherwise the first letter (same circle as before).
 function Av({ u, name }) {
@@ -31,6 +32,7 @@ export default function SupportSection() {
   const [text, setText] = useState('');
   const [imgs, setImgs] = useState([]);
   const [sending, setSending] = useState(false);
+  const [prodPick, setProdPick] = useState(false);
   const endRef = useRef(null);
 
   const threads = useAsync(() => api('/admin/support/threads'), [], { every: 0 });
@@ -128,14 +130,17 @@ export default function SupportSection() {
                   {m.sender !== 'admin' && <Av u={conv.data?.user || sel} name={who(sel)} />}
                   <div className={`bubble ${m.sender === 'admin' ? 'out' : ''}`} style={m.sender === 'admin' ? undefined : { maxWidth: 'none' }}>
                     {m.text}
-                    {m.images?.length > 0 && <div className="flex gap" style={{ flexWrap: 'wrap', marginTop: 6 }}>{m.images.map((u) => <a key={u} href={assetUrl(u)} target="_blank" rel="noopener noreferrer"><img src={assetUrl(u)} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8 }} /></a>)}</div>}
+                    {m.images?.length > 0 && <div className="flex gap" style={{ flexWrap: 'wrap', marginTop: 6 }}>{m.images.map((u) => <a key={u} href={assetUrl(u)} target="_blank" rel="noopener noreferrer">{/\.(mp4|webm)(\?|$)/i.test(u) ? <video src={assetUrl(u)} controls preload="metadata" style={{ width: 160, maxHeight: 200, borderRadius: 8, background: '#000' }} /> : <img src={assetUrl(u)} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8 }} />}</a>)}</div>}
                     <small>{dt(m.created_at)}{m.edited ? ' · edited' : ''} · <a role="button" style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => delMsg(m)}>delete</a></small>
                   </div>
                   </div>
                 ))}
                 <div ref={endRef} />
               </div>
+              <div style={{ padding: '4px 12px 0' }}><button type="button" className="btn sm" onClick={() => setProdPick(true)}>🛍 Send a product</button></div>
               <ChatComposer text={text} onText={setText} images={imgs} onImages={setImgs} onSend={send} sending={sending} />
+              {prodPick && <ChatProductPicker thread={sel} onClose={() => setProdPick(false)} onSent={() => { setProdPick(false); conv.reload(); threads.reload(); }}
+                onPick={(p) => api(`/admin/support/threads/${sel.user_id}/messages`, { method: 'POST', body: { text: `${p.name}\n${p.price} Tk\n${p.link}`, images: [] } })} />}
             </>
           )}
         </div>

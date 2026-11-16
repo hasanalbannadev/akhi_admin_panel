@@ -11,6 +11,7 @@ import { useConfirm, useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { dt, timeAgo } from '@/lib/format';
+import ChatProductPicker from './ChatProductPicker';
 
 const CHANNELS = [
   { key: 'messenger', label: 'Messenger' },
@@ -244,6 +245,7 @@ export default function ChatSection() {
   const [att, setAtt] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [fwd, setFwd] = useState(null);
+  const [prodPick, setProdPick] = useState(false);
   const fileRef = useRef(null);
   const endRef = useRef(null);
   const [cview, setCview] = useState('posts');
@@ -459,6 +461,7 @@ export default function ChatSection() {
                 {sel.channel !== 'comment' && <>
                   <input ref={fileRef} type="file" hidden onChange={pickFile} accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" />
                   <button type="button" className="btn" aria-label="Attach a file" disabled={uploading} onClick={() => fileRef.current && fileRef.current.click()}>📎</button>
+                  <button type="button" className="btn" aria-label="Send a product" title="Send a product" onClick={() => setProdPick(true)}>🛍</button>
                 </>}
                 <input className="input" style={{ minWidth: 0 }} value={text} onChange={(e) => setText(e.target.value)} placeholder={att ? 'Add a caption…' : sel.channel === 'comment' ? 'Reply to the comment…' : 'Write a reply…'} maxLength={1900} />
                 <button className="btn pri" disabled={sending || uploading || (!text.trim() && !att)}><Icon name="send" size={15} /> Send</button>
@@ -468,6 +471,7 @@ export default function ChatSection() {
         </div>
       </div>
       )}
+      {prodPick && sel && <ChatProductPicker thread={sel} onClose={() => setProdPick(false)} onSent={() => { setProdPick(false); msgs.reload(); threads.reload(); }} />}
       {fwd && (
         <div onClick={() => setFwd(null)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(15,18,40,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 440, maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

@@ -3,7 +3,7 @@
  * META CATALOG — one feed for Facebook / Instagram / WhatsApp / Messenger shops + live health check with fix buttons.
  * APIs: GET /admin/meta-catalog/status · POST /admin/meta-catalog/fix {action} · GET /admin/meta-feed/info
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, ErrorBox, Loading } from '@/components/ui';
 import { useToast } from '@/components/Providers';
 import { api } from '@/lib/api';
@@ -16,6 +16,11 @@ export default function MetaCatalogSection() {
   const st = useAsync(() => api('/admin/meta-catalog/status'), []);
   const info = useAsync(() => api('/admin/meta-feed/info'), []);
   const [busy, setBusy] = useState('');
+  const [wl, setWl] = useState(null);                       // Auto catalog (welcome) settings
+  useEffect(() => { api('/admin/meta-catalog/welcome').then(setWl).catch(() => {}); }, []);
+  async function saveWl() {
+    try { const r = await api('/admin/meta-catalog/welcome', { method: 'PUT', body: wl }); setWl(r); toast.ok('Saved'); } catch (e) { toast.error(e.message); }
+  }
   const copy = (t) => { try { navigator.clipboard.writeText(t); toast.ok('Copied'); } catch { toast.error('Copy failed'); } };
   if (st.error) return <ErrorBox error={st.error} onRetry={st.reload} />;
   if (info.error) return <ErrorBox error={info.error} onRetry={info.reload} />;
@@ -48,6 +53,29 @@ export default function MetaCatalogSection() {
           ))}
         </div>
       </div></div>
+
+      {wl && <div className="card" style={{ marginBottom: 14 }}><div className="bd">
+        <div className="flex sp center gap wrap">
+          <div><b>Auto catalog for new chats</b> <Badge tone={wl.on ? 'green' : 'gray'}>{wl.on ? 'ON' : 'OFF'}</Badge>
+            <div className="muted sm">When a customer writes for the very first time (Messenger / Instagram / WhatsApp), category cards are sent automatically after your own greeting. Each card opens the website; with a shop link below it also gets a "🛍 Shop" button.</div></div>
+          <label className="flex gap center"><input type="checkbox" checked={wl.on} onChange={(e) => setWl({ ...wl, on: e.target.checked })} /> Turn on</label>
+        </div>
+        <div className="flex gap wrap" style={{ marginTop: 10 }}>
+          <label className="sm" style={{ flex: '1 1 160px' }}>Show<br />
+            <select className="input" style={{ width: '100%' }} value={wl.mode} onChange={(e) => setWl({ ...wl, mode: e.target.value })}>
+              <option value="categories">Categories</option><option value="products">Latest products</option></select></label>
+          <label className="sm" style={{ flex: '1 1 100px' }}>Wait (seconds)<br />
+            <input className="input" type="number" min={0} max={30} style={{ width: '100%' }} value={wl.delay} onChange={(e) => setWl({ ...wl, delay: Number(e.target.value) || 0 })} /></label>
+        </div>
+        <div className="flex gap wrap" style={{ marginTop: 8 }}>
+          <label className="sm" style={{ flex: '1 1 260px' }}>Facebook Shop link (optional)<br />
+            <input className="input" style={{ width: '100%' }} placeholder="https://www.facebook.com/yourpage/shop" value={wl.shop_fb} onChange={(e) => setWl({ ...wl, shop_fb: e.target.value })} /></label>
+          <label className="sm" style={{ flex: '1 1 260px' }}>Instagram Shop link (optional)<br />
+            <input className="input" style={{ width: '100%' }} placeholder="https://www.instagram.com/yourname/" value={wl.shop_ig} onChange={(e) => setWl({ ...wl, shop_ig: e.target.value })} /></label>
+        </div>
+        <div style={{ marginTop: 10 }}><button className="btn pri" onClick={saveWl}>Save</button></div>
+        <div className="muted sm" style={{ marginTop: 6 }}>The same "🛍 Shop" button is also added to every product / category card you send by hand from a chat. If Meta's own automatic greeting is on, keep it: ours only adds the cards after it.</div>
+      </div></div>}
 
       <div className="card" style={{ marginBottom: 14 }}><div className="bd">
         <b>Catalog feed link</b> <Badge tone="green">Automatic</Badge>
