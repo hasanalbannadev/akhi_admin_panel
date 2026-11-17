@@ -18,6 +18,9 @@ export default function MetaCatalogSection() {
   const [busy, setBusy] = useState('');
   const [wl, setWl] = useState(null);                       // Auto catalog (welcome) settings
   const [wlErr, setWlErr] = useState('');
+  const [wlog, setWlog] = useState([]);
+  const loadLog = () => api('/admin/meta-catalog/welcome-log').then((r) => setWlog(r.items || [])).catch(() => {});
+  useEffect(() => { loadLog(); }, []);
   useEffect(() => { api('/admin/meta-catalog/welcome').then(setWl).catch((e) => setWlErr(e.message || 'error')); }, []);
   async function saveWl() {
     try { const r = await api('/admin/meta-catalog/welcome', { method: 'PUT', body: wl }); setWl(r); toast.ok('Saved'); } catch (e) { toast.error(e.message); }
@@ -59,7 +62,7 @@ export default function MetaCatalogSection() {
       {wl && <div className="card" style={{ marginBottom: 14 }}><div className="bd">
         <div className="flex sp center gap wrap">
           <div><b>Auto catalog for new chats</b> <Badge tone={wl.on ? 'green' : 'gray'}>{wl.on ? 'ON' : 'OFF'}</Badge>
-            <div className="muted sm">When a customer writes for the very first time (Messenger / Instagram / WhatsApp), category cards are sent automatically after your own greeting. Each card opens the website; with a shop link below it also gets a "🛍 Shop" button.</div></div>
+            <div className="muted sm">When a customer writes for the first time, or again after being silent for the hours set below (Messenger / Instagram / WhatsApp), your greeting and then the category cards are sent automatically. Each card opens the website; with a shop link below it also gets a "🛍 Shop" button.</div></div>
           <label className="flex gap center"><input type="checkbox" checked={wl.on} onChange={(e) => setWl({ ...wl, on: e.target.checked })} /> Turn on</label>
         </div>
         <div className="flex gap wrap" style={{ marginTop: 10 }}>
@@ -68,6 +71,17 @@ export default function MetaCatalogSection() {
               <option value="categories">Categories</option><option value="products">Latest products</option></select></label>
           <label className="sm" style={{ flex: '1 1 100px' }}>Wait (seconds)<br />
             <input className="input" type="number" min={0} max={30} style={{ width: '100%' }} value={wl.delay} onChange={(e) => setWl({ ...wl, delay: Number(e.target.value) || 0 })} /></label>
+          <label className="sm" style={{ flex: '1 1 140px' }}>Again after silence (hours)<br />
+            <input className="input" type="number" min={1} max={72} style={{ width: '100%' }} value={wl.gap_hours ?? 6} onChange={(e) => setWl({ ...wl, gap_hours: Math.max(1, Number(e.target.value) || 6) })} /></label>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <label className="sm">Greeting sent first by this server (optional)<br />
+            <textarea className="input" rows={3} style={{ width: '100%' }} maxLength={1000} placeholder="আসসালামু আলাইকুম! Akhi Lifestyle-এ স্বাগতম 😊 নিচে আমাদের কালেকশন দেখুন।" value={wl.greeting || ''} onChange={(e) => setWl({ ...wl, greeting: e.target.value })} /></label>
+          <div className="flex gap wrap sm" style={{ marginTop: 4 }}>
+            {[['greet_wa', 'WhatsApp'], ['greet_fb', 'Messenger'], ['greet_ig', 'Instagram']].map(([k, l]) => (
+              <label key={k} className="flex gap center"><input type="checkbox" checked={!!wl[k]} onChange={(e) => setWl({ ...wl, [k]: e.target.checked })} /> {l}</label>))}
+            <span className="muted">(Messenger/Instagram-এ Meta-র নিজের গ্রিটিং থাকলে টিক দেবেন না)</span>
+          </div>
         </div>
         <div className="flex gap wrap" style={{ marginTop: 8 }}>
           <label className="sm" style={{ flex: '1 1 260px' }}>Facebook Shop link (optional)<br />
@@ -76,6 +90,13 @@ export default function MetaCatalogSection() {
             <input className="input" style={{ width: '100%' }} placeholder="https://www.instagram.com/yourname/" value={wl.shop_ig} onChange={(e) => setWl({ ...wl, shop_ig: e.target.value })} /></label>
         </div>
         <div style={{ marginTop: 10 }}><button className="btn pri" onClick={saveWl}>Save</button></div>
+        <div style={{ marginTop: 14 }}>
+          <div className="flex gap center"><b className="sm">Last auto-catalog attempts</b><button className="btn sm" onClick={loadLog}>Refresh</button></div>
+          {wlog.length === 0 ? <div className="muted sm">Nothing yet. After a customer writes, the result (sent / why not) shows here.</div> : wlog.map((l, i) => (
+            <div key={i} className="sm" style={{ padding: '4px 0', borderBottom: '1px solid #eee' }}>
+              <Badge tone={l.status === 'ok' ? 'green' : l.status === 'fail' ? 'red' : 'gray'}>{l.status}</Badge> <b>{l.ch}</b> · <span className="muted">{new Date(l.t).toLocaleString()}</span><br />{l.msg}
+            </div>))}
+        </div>
         <div className="muted sm" style={{ marginTop: 6 }}>The same "🛍 Shop" button is also added to every product / category card you send by hand from a chat. If Meta's own automatic greeting is on, keep it: ours only adds the cards after it.</div>
       </div></div>}
 
